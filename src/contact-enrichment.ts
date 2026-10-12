@@ -329,7 +329,7 @@ async function searchOfficialWebsites(
             queries,
             maxPagesPerQuery: 1,
             resultsPerPage: 5,
-            countryCode: input.country,
+            countryCode: input.country.toLowerCase(),
             languageCode: 'en',
             mobileResults: false,
             includeUnfilteredResults: false,

@@ -53,6 +53,7 @@ export function leadFingerprint(lead: LeadRecord): string {
         public_business_emails: [...lead.public_business_emails].sort(),
         public_business_phones: [...lead.public_business_phones].sort(),
         social_urls: [...lead.social_urls].sort(),
+        contact_status: lead.contact_status,
     };
     return createHash('sha256').update(JSON.stringify(stable)).digest('hex');
 }
