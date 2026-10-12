@@ -1,0 +1,116 @@
+{
+  "$schema": "https://apify.com/schemas/v1/input.ide.json",
+  "title": "Vestiaire multi-brand lead search",
+  "description": "Search public Vestiaire listings for several brands and aggregate sellers that appear across those brands.",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "brands": {
+      "title": "Brands or search phrases",
+      "type": "array",
+      "description": "Distinct brand names or public search phrases. Use 3-5 focused brands for the first run.",
+      "editor": "stringList",
+      "default": ["Gucci", "Chanel", "Louis Vuitton"],
+      "prefill": ["Gucci", "Chanel", "Louis Vuitton"],
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "country": {
+      "title": "Market",
+      "type": "string",
+      "description": "Vestiaire market used for URLs and localized pricing.",
+      "editor": "select",
+      "default": "US",
+      "enum": ["US", "GB", "FR", "DE", "IT", "ES"],
+      "enumTitles": ["United States", "United Kingdom", "France", "Germany", "Italy", "Spain"]
+    },
+    "maxItemsPerBrand": {
+      "title": "Maximum listings per brand",
+      "type": "integer",
+      "description": "Maximum public listing cards retained for each brand.",
+      "editor": "number",
+      "default": 48,
+      "minimum": 1,
+      "maximum": 500
+    },
+    "maxPagesPerBrand": {
+      "title": "Maximum pages per brand",
+      "type": "integer",
+      "description": "Safety cap for search pagination. Vestiaire typically returns up to 48 listings per page.",
+      "editor": "number",
+      "default": 2,
+      "minimum": 1,
+      "maximum": 10
+    },
+    "minBrandCount": {
+      "title": "Minimum distinct brands per seller",
+      "type": "integer",
+      "description": "Only output sellers represented in at least this many searched brands.",
+      "editor": "number",
+      "default": 2,
+      "minimum": 1,
+      "maximum": 20
+    },
+    "minListingsPerSeller": {
+      "title": "Minimum matching listings per seller",
+      "type": "integer",
+      "description": "Only output sellers with at least this many matching listings in the sampled results.",
+      "editor": "number",
+      "default": 2,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "includeProducts": {
+      "title": "Include normalized product rows",
+      "type": "boolean",
+      "description": "Also write the product evidence used to build leads to the default Dataset.",
+      "editor": "checkbox",
+      "default": false
+    },
+    "maxConcurrency": {
+      "title": "Browser concurrency",
+      "type": "integer",
+      "description": "Parallel brand search pages. Keep between 1 and 3 to reduce blocking.",
+      "editor": "number",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 3
+    },
+    "maxRequestRetries": {
+      "title": "Maximum retries",
+      "type": "integer",
+      "description": "Maximum browser retries for a failed brand search.",
+      "editor": "number",
+      "default": 2,
+      "minimum": 0,
+      "maximum": 5
+    },
+    "navigationTimeoutSecs": {
+      "title": "Search response timeout",
+      "type": "integer",
+      "description": "Seconds to wait for the public product-search response.",
+      "editor": "number",
+      "default": 60,
+      "minimum": 15,
+      "maximum": 180
+    },
+    "proxyConfiguration": {
+      "title": "Proxy configuration",
+      "type": "object",
+      "description": "Standard Apify proxy settings. Residential proxy matching the selected market is recommended for stable cloud runs.",
+      "editor": "proxy",
+      "default": {
+        "useApifyProxy": false
+      },
+      "prefill": {
+        "useApifyProxy": false
+      }
+    }
+  },
+  "required": ["brands"],
+  "additionalProperties": false
+}

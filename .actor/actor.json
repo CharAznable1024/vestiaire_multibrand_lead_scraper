@@ -1,0 +1,18 @@
+{
+  "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+  "actorSpecification": 1,
+  "name": "vestiaire-multibrand-lead-scraper",
+  "title": "Vestiaire Multi-brand Lead Scraper",
+  "description": "Find public Vestiaire seller leads that list products across multiple searched brands.",
+  "version": "0.1",
+  "meta": {
+    "templateId": "ts-crawlee-playwright-chrome",
+    "generatedBy": "TRAE with GPT-5"
+  },
+  "inputSchema": "./input_schema.json",
+  "outputSchema": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile"
+}

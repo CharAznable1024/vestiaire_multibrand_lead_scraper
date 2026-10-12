@@ -1,0 +1,99 @@
+{
+  "$schema": "https://apify.com/schemas/v1/dataset.ide.json",
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+    "record_type": { "type": "string" },
+    "schema_version": { "type": "string" },
+    "seller_id": { "type": "string" },
+    "display_name": { "type": ["string", "null"] },
+    "seller_badge": { "type": ["string", "null"] },
+    "is_official_store": { "type": "boolean" },
+    "countries": { "type": "array", "items": { "type": "string" } },
+    "brands": { "type": "array", "items": { "type": "string" } },
+    "brand_count": { "type": "integer" },
+    "listing_count": { "type": "integer" },
+    "total_likes": { "type": "integer" },
+    "average_price": { "type": ["number", "null"] },
+    "price_currency": { "type": ["string", "null"] },
+    "sample_product_urls": { "type": "array", "items": { "type": "string" } },
+    "profile_url": { "type": "string" },
+    "lead_score": { "type": "integer" },
+    "qualification": { "type": "string" },
+    "qualification_reasons": { "type": "array", "items": { "type": "string" } },
+    "scraped_at": { "type": "string" },
+    "source_site": { "type": "string" },
+    "search_brand": { "type": "string" },
+    "item_id": { "type": "string" },
+    "title": { "type": "string" },
+    "brand": { "type": ["string", "null"] },
+    "description": { "type": ["string", "null"] },
+    "country": { "type": ["string", "null"] },
+    "item_url": { "type": "string" },
+    "price_amount": { "type": ["number", "null"] },
+    "original_price_amount": { "type": ["number", "null"] },
+    "likes": { "type": "integer" },
+    "sold": { "type": "boolean" },
+    "stock": { "type": ["boolean", "number", "string", "null"] },
+    "colors": { "type": "array", "items": { "type": "string" } },
+    "image_urls": { "type": "array", "items": { "type": "string" } },
+    "seller_display_name": { "type": ["string", "null"] },
+    "seller_profile_url": { "type": ["string", "null"] }
+    }
+  },
+  "views": {
+    "leads": {
+      "title": "Merchant leads",
+      "transformation": {
+        "filter": { "field": "record_type", "operator": "equal", "value": "merchant_lead" },
+        "fields": ["seller_id", "display_name", "is_official_store", "seller_badge", "brands", "brand_count", "listing_count", "total_likes", "average_price", "price_currency", "lead_score", "qualification", "profile_url", "sample_product_urls", "scraped_at"]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "seller_id": { "label": "Seller ID", "format": "text" },
+          "display_name": { "label": "Seller", "format": "text" },
+          "is_official_store": { "label": "Official", "format": "boolean" },
+          "seller_badge": { "label": "Badge", "format": "text" },
+          "brands": { "label": "Brands", "format": "array" },
+          "brand_count": { "label": "Brand count", "format": "number" },
+          "listing_count": { "label": "Listings", "format": "number" },
+          "total_likes": { "label": "Likes", "format": "number" },
+          "average_price": { "label": "Average price", "format": "number" },
+          "price_currency": { "label": "Currency", "format": "text" },
+          "lead_score": { "label": "Lead score", "format": "number" },
+          "qualification": { "label": "Qualification", "format": "text" },
+          "profile_url": { "label": "Profile", "format": "link" },
+          "sample_product_urls": { "label": "Evidence", "format": "array" },
+          "scraped_at": { "label": "Scraped at", "format": "date" }
+        }
+      }
+    },
+    "products": {
+      "title": "Product evidence",
+      "transformation": {
+        "filter": { "field": "record_type", "operator": "equal", "value": "product" },
+        "fields": ["search_brand", "item_id", "title", "brand", "price_amount", "price_currency", "country", "likes", "seller_id", "seller_display_name", "item_url", "image_urls", "scraped_at"]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "search_brand": { "label": "Search brand", "format": "text" },
+          "item_id": { "label": "Item ID", "format": "text" },
+          "title": { "label": "Title", "format": "text" },
+          "brand": { "label": "Brand", "format": "text" },
+          "price_amount": { "label": "Price", "format": "number" },
+          "price_currency": { "label": "Currency", "format": "text" },
+          "country": { "label": "Country", "format": "text" },
+          "likes": { "label": "Likes", "format": "number" },
+          "seller_id": { "label": "Seller ID", "format": "text" },
+          "seller_display_name": { "label": "Seller", "format": "text" },
+          "item_url": { "label": "Product", "format": "link" },
+          "image_urls": { "label": "Images", "format": "array" },
+          "scraped_at": { "label": "Scraped at", "format": "date" }
+        }
+      }
+    }
+  }
+}

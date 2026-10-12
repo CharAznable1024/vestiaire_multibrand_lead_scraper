@@ -1,0 +1,30 @@
+{
+  "name": "vestiaire-multibrand-lead-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Apify Actor that identifies multi-brand Vestiaire Collective seller leads.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "start:prod": "node dist/main.js",
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@crawlee/playwright": "^3.15.3",
+    "apify": "^3.7.0",
+    "playwright": "1.61.1"
+  },
+  "devDependencies": {
+    "@apify/tsconfig": "^0.2.0",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.3",
+    "typescript": "^6.0.0",
+    "vitest": "^5.0.0"
+  },
+  "license": "UNLICENSED"
+}

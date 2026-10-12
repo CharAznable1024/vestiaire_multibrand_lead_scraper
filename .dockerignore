@@ -1,0 +1,10 @@
+.git/
+.github/
+.idea/
+.vscode/
+dist/
+node_modules/
+storage/
+apify_storage/
+crawlee_storage/
+*.log

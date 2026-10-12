@@ -1,0 +1,15 @@
+{
+  "brands": ["Gucci", "Chanel", "Louis Vuitton"],
+  "country": "US",
+  "maxItemsPerBrand": 48,
+  "maxPagesPerBrand": 2,
+  "minBrandCount": 2,
+  "minListingsPerSeller": 2,
+  "includeProducts": false,
+  "maxConcurrency": 1,
+  "maxRequestRetries": 2,
+  "navigationTimeoutSecs": 60,
+  "proxyConfiguration": {
+    "useApifyProxy": false
+  }
+}
