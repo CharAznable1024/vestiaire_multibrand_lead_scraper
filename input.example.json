@@ -9,6 +9,15 @@
   "maxConcurrency": 1,
   "maxRequestRetries": 2,
   "navigationTimeoutSecs": 60,
+  "dedupeMode": "new_and_updated",
+  "dedupeStoreName": "vestiaire-multibrand-lead-state",
+  "reemitAfterDays": 30,
+  "contactEnrichment": true,
+  "maxContactEnrichmentLeads": 10,
+  "minLeadScoreForEnrichment": 50,
+  "minContactConfidence": 80,
+  "contactCacheDays": 30,
+  "contactSearchActorId": "apify/google-search-scraper",
   "proxyConfiguration": {
     "useApifyProxy": false
   }

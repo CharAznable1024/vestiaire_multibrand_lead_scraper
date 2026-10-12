@@ -2,6 +2,8 @@ import { PlaywrightCrawler } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
 
 import { normalizeInput } from './input.js';
+import { enrichContacts } from './contact-enrichment.js';
+import { applyCrossRunDedupe, normalizePersistentState } from './dedupe.js';
 import { buildLeads, countSellers } from './leads.js';
 import { searchUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
@@ -21,6 +23,12 @@ const startedAt = new Date().toISOString();
 const productsById = new Map<string, ProductRecord>();
 const failedBrands: Array<{ brand: string; error: string }> = [];
 const capturedResponses = new Map<string, Promise<CapturedSearchResponse>>();
+let qualifiedLeadCount = 0;
+let emittedLeadCount = 0;
+let duplicateSuppressedCount = 0;
+let contactEnrichmentAttempted = 0;
+let contactEnrichmentVerified = 0;
+let contactEnrichmentCached = 0;
 
 function responseKey(request: { id?: string; uniqueKey: string }): string {
     return request.id ?? request.uniqueKey;
@@ -33,7 +41,12 @@ const summary = (status: RunSummary['status']): RunSummary => ({
     failed_brands: failedBrands,
     product_count: productsById.size,
     seller_count: countSellers([...productsById.values()]),
-    qualified_lead_count: 0,
+    qualified_lead_count: qualifiedLeadCount,
+    emitted_lead_count: emittedLeadCount,
+    duplicate_suppressed_count: duplicateSuppressedCount,
+    contact_enrichment_attempted: contactEnrichmentAttempted,
+    contact_enrichment_verified: contactEnrichmentVerified,
+    contact_enrichment_cached: contactEnrichmentCached,
     started_at: startedAt,
     ...(status === 'RUNNING' ? {} : { finished_at: new Date().toISOString() }),
 });
@@ -139,13 +152,31 @@ if (failedBrands.length === input.brands.length) {
 const products = [...productsById.values()];
 const scrapedAt = new Date().toISOString();
 const leads = buildLeads(products, input.country, input.minBrandCount, input.minListingsPerSeller, scrapedAt);
+qualifiedLeadCount = leads.length;
 
-if (leads.length) await Actor.pushData(leads);
+const stateStore = await Actor.openKeyValueStore(input.dedupeStoreName);
+const previousState = normalizePersistentState(await stateStore.getValue('STATE'));
+const contactResult = await enrichContacts(leads, input, previousState, scrapedAt);
+contactEnrichmentAttempted = contactResult.attempted;
+contactEnrichmentVerified = contactResult.verified;
+contactEnrichmentCached = contactResult.cached;
+
+const dedupeResult = applyCrossRunDedupe(
+    contactResult.leads,
+    previousState,
+    input.dedupeMode,
+    input.reemitAfterDays,
+    scrapedAt,
+);
+emittedLeadCount = dedupeResult.emitted.length;
+duplicateSuppressedCount = dedupeResult.suppressed;
+await stateStore.setValue('STATE', dedupeResult.state);
+
+if (dedupeResult.emitted.length) await Actor.pushData(dedupeResult.emitted);
 if (input.includeProducts && products.length) await Actor.pushData(products);
 
 const output: RunSummary = {
     ...summary('SUCCEEDED'),
-    qualified_lead_count: leads.length,
     finished_at: new Date().toISOString(),
 };
 await Actor.setValue('OUTPUT', output);

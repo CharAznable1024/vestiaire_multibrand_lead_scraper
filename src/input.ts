@@ -1,4 +1,4 @@
-import type { ActorInput, Market, NormalizedInput, ProxyInput } from './types.js';
+import type { ActorInput, DedupeMode, Market, NormalizedInput, ProxyInput } from './types.js';
 
 const MARKETS = new Set<Market>(['US', 'GB', 'FR', 'DE', 'IT', 'ES']);
 
@@ -24,6 +24,14 @@ function proxy(value: unknown): ProxyInput {
     return value as ProxyInput;
 }
 
+function text(value: unknown, fallback: string, field: string, pattern?: RegExp): string {
+    const candidate = value === undefined ? fallback : value;
+    if (typeof candidate !== 'string' || !candidate.trim() || (pattern && !pattern.test(candidate))) {
+        throw new Error(`${field} is invalid`);
+    }
+    return candidate.trim();
+}
+
 export function normalizeInput(raw: ActorInput | null | undefined): NormalizedInput {
     const input = raw ?? {};
     if (!Array.isArray(input.brands)) throw new Error('brands must be an array of strings');
@@ -45,6 +53,11 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         throw new Error('minBrandCount cannot exceed the number of distinct brands');
     }
 
+    const dedupeMode = (input.dedupeMode ?? 'new_and_updated') as DedupeMode;
+    if (!['all', 'new_only', 'new_and_updated'].includes(dedupeMode)) {
+        throw new Error('dedupeMode must be all, new_only, or new_and_updated');
+    }
+
     return {
         brands,
         country,
@@ -57,5 +70,35 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         maxRequestRetries: integer(input.maxRequestRetries, 2, 0, 5, 'maxRequestRetries'),
         navigationTimeoutSecs: integer(input.navigationTimeoutSecs, 60, 15, 180, 'navigationTimeoutSecs'),
         proxyConfiguration: proxy(input.proxyConfiguration),
+        dedupeMode,
+        dedupeStoreName: text(
+            input.dedupeStoreName,
+            'vestiaire-multibrand-lead-state',
+            'dedupeStoreName',
+            /^[a-zA-Z0-9._-]{3,63}$/,
+        ),
+        reemitAfterDays: integer(input.reemitAfterDays, 30, 0, 3650, 'reemitAfterDays'),
+        contactEnrichment: boolean(input.contactEnrichment, true, 'contactEnrichment'),
+        maxContactEnrichmentLeads: integer(
+            input.maxContactEnrichmentLeads,
+            10,
+            0,
+            50,
+            'maxContactEnrichmentLeads',
+        ),
+        minLeadScoreForEnrichment: integer(
+            input.minLeadScoreForEnrichment,
+            50,
+            0,
+            100,
+            'minLeadScoreForEnrichment',
+        ),
+        minContactConfidence: integer(input.minContactConfidence, 80, 0, 100, 'minContactConfidence'),
+        contactCacheDays: integer(input.contactCacheDays, 30, 0, 3650, 'contactCacheDays'),
+        contactSearchActorId: text(
+            input.contactSearchActorId,
+            'apify/google-search-scraper',
+            'contactSearchActorId',
+        ),
     };
 }

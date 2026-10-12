@@ -22,6 +22,19 @@
     "lead_score": { "type": "integer" },
     "qualification": { "type": "string" },
     "qualification_reasons": { "type": "array", "items": { "type": "string" } },
+    "dedupe_status": { "type": "string" },
+    "first_seen_at": { "type": "string" },
+    "last_seen_at": { "type": "string" },
+    "times_seen": { "type": "integer" },
+    "official_website": { "type": ["string", "null"] },
+    "contact_candidate_url": { "type": ["string", "null"] },
+    "public_business_emails": { "type": "array", "items": { "type": "string" } },
+    "public_business_phones": { "type": "array", "items": { "type": "string" } },
+    "social_urls": { "type": "array", "items": { "type": "string" } },
+    "contact_source_urls": { "type": "array", "items": { "type": "string" } },
+    "contact_confidence": { "type": "integer" },
+    "contact_status": { "type": "string" },
+    "contact_error": { "type": ["string", "null"] },
     "scraped_at": { "type": "string" },
     "source_site": { "type": "string" },
     "search_brand": { "type": "string" },
@@ -47,13 +60,14 @@
       "title": "Merchant leads",
       "transformation": {
         "filter": { "field": "record_type", "operator": "equal", "value": "merchant_lead" },
-        "fields": ["seller_id", "display_name", "is_official_store", "seller_badge", "brands", "brand_count", "listing_count", "total_likes", "average_price", "price_currency", "lead_score", "qualification", "profile_url", "sample_product_urls", "scraped_at"]
+        "fields": ["seller_id", "display_name", "dedupe_status", "is_official_store", "seller_badge", "brands", "brand_count", "listing_count", "total_likes", "average_price", "price_currency", "lead_score", "qualification", "official_website", "public_business_emails", "public_business_phones", "contact_confidence", "contact_status", "profile_url", "sample_product_urls", "first_seen_at", "last_seen_at", "times_seen", "scraped_at"]
       },
       "display": {
         "component": "table",
         "properties": {
           "seller_id": { "label": "Seller ID", "format": "text" },
           "display_name": { "label": "Seller", "format": "text" },
+          "dedupe_status": { "label": "Change", "format": "text" },
           "is_official_store": { "label": "Official", "format": "boolean" },
           "seller_badge": { "label": "Badge", "format": "text" },
           "brands": { "label": "Brands", "format": "array" },
@@ -64,8 +78,16 @@
           "price_currency": { "label": "Currency", "format": "text" },
           "lead_score": { "label": "Lead score", "format": "number" },
           "qualification": { "label": "Qualification", "format": "text" },
+          "official_website": { "label": "Official website", "format": "link" },
+          "public_business_emails": { "label": "Business emails", "format": "array" },
+          "public_business_phones": { "label": "Business phones", "format": "array" },
+          "contact_confidence": { "label": "Contact confidence", "format": "number" },
+          "contact_status": { "label": "Contact status", "format": "text" },
           "profile_url": { "label": "Profile", "format": "link" },
           "sample_product_urls": { "label": "Evidence", "format": "array" },
+          "first_seen_at": { "label": "First seen", "format": "date" },
+          "last_seen_at": { "label": "Last seen", "format": "date" },
+          "times_seen": { "label": "Times seen", "format": "number" },
           "scraped_at": { "label": "Scraped at", "format": "date" }
         }
       }

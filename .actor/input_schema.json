@@ -98,6 +98,84 @@
       "minimum": 15,
       "maximum": 180
     },
+    "dedupeMode": {
+      "title": "Cross-run deduplication mode",
+      "type": "string",
+      "description": "all emits every qualified lead; new_only emits unseen sellers; new_and_updated emits unseen sellers and sellers whose stable business/contact fields changed.",
+      "editor": "select",
+      "default": "new_and_updated",
+      "enum": ["all", "new_only", "new_and_updated"],
+      "enumTitles": ["All qualified leads", "New sellers only", "New and updated sellers"]
+    },
+    "dedupeStoreName": {
+      "title": "Persistent deduplication store",
+      "type": "string",
+      "description": "Named Apify key-value store used across runs. Use a different name to isolate independent campaigns.",
+      "editor": "textfield",
+      "default": "vestiaire-multibrand-lead-state",
+      "pattern": "^[a-zA-Z0-9._-]{3,63}$"
+    },
+    "reemitAfterDays": {
+      "title": "Re-emit unchanged leads after days",
+      "type": "integer",
+      "description": "Emit an otherwise unchanged seller after this many days. Set to 0 to never re-emit unchanged leads.",
+      "editor": "number",
+      "default": 30,
+      "minimum": 0,
+      "maximum": 3650
+    },
+    "contactEnrichment": {
+      "title": "Enrich public business contacts",
+      "type": "boolean",
+      "description": "Discover likely official websites using Apify Google Search and extract only publicly displayed business emails, phone numbers, and social links from the website.",
+      "editor": "checkbox",
+      "default": true,
+      "sectionCaption": "Public business contact enrichment",
+      "sectionDescription": "This starts a paid Google Search Actor run for eligible leads. It does not use Google's personal-lead enrichment and does not attempt to identify private individuals."
+    },
+    "maxContactEnrichmentLeads": {
+      "title": "Maximum leads to enrich",
+      "type": "integer",
+      "description": "Maximum highest-scoring leads searched per run. Each uncached lead can add one Google search page plus public website requests.",
+      "editor": "number",
+      "default": 10,
+      "minimum": 0,
+      "maximum": 50
+    },
+    "minLeadScoreForEnrichment": {
+      "title": "Minimum lead score for enrichment",
+      "type": "integer",
+      "description": "Only leads at or above this lead score are considered for contact enrichment.",
+      "editor": "number",
+      "default": 50,
+      "minimum": 0,
+      "maximum": 100
+    },
+    "minContactConfidence": {
+      "title": "Minimum verified contact confidence",
+      "type": "integer",
+      "description": "Minimum evidence score required before a candidate website and its public contacts are marked verified.",
+      "editor": "number",
+      "default": 80,
+      "minimum": 0,
+      "maximum": 100
+    },
+    "contactCacheDays": {
+      "title": "Contact cache duration",
+      "type": "integer",
+      "description": "Reuse contact evidence from the persistent state store for this many days before searching again.",
+      "editor": "number",
+      "default": 30,
+      "minimum": 0,
+      "maximum": 3650
+    },
+    "contactSearchActorId": {
+      "title": "Search Actor ID",
+      "type": "string",
+      "description": "Apify Actor used only to discover candidate official websites. Changing it requires compatible Google organic-result output.",
+      "editor": "textfield",
+      "default": "apify/google-search-scraper"
+    },
     "proxyConfiguration": {
       "title": "Proxy configuration",
       "type": "object",

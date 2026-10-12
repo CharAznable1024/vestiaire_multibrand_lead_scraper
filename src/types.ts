@@ -1,4 +1,7 @@
 export type Market = 'US' | 'GB' | 'FR' | 'DE' | 'IT' | 'ES';
+export type DedupeMode = 'all' | 'new_only' | 'new_and_updated';
+export type DedupeStatus = 'new' | 'updated' | 'seen';
+export type ContactStatus = 'not_requested' | 'not_eligible' | 'cached' | 'not_found' | 'candidate' | 'verified' | 'error';
 
 export interface ProxyInput {
     useApifyProxy?: boolean;
@@ -19,6 +22,15 @@ export interface ActorInput {
     maxRequestRetries?: unknown;
     navigationTimeoutSecs?: unknown;
     proxyConfiguration?: unknown;
+    dedupeMode?: unknown;
+    dedupeStoreName?: unknown;
+    reemitAfterDays?: unknown;
+    contactEnrichment?: unknown;
+    maxContactEnrichmentLeads?: unknown;
+    minLeadScoreForEnrichment?: unknown;
+    minContactConfidence?: unknown;
+    contactCacheDays?: unknown;
+    contactSearchActorId?: unknown;
 }
 
 export interface NormalizedInput {
@@ -33,6 +45,15 @@ export interface NormalizedInput {
     maxRequestRetries: number;
     navigationTimeoutSecs: number;
     proxyConfiguration: ProxyInput;
+    dedupeMode: DedupeMode;
+    dedupeStoreName: string;
+    reemitAfterDays: number;
+    contactEnrichment: boolean;
+    maxContactEnrichmentLeads: number;
+    minLeadScoreForEnrichment: number;
+    minContactConfidence: number;
+    contactCacheDays: number;
+    contactSearchActorId: string;
 }
 
 export interface RawSearchResponse {
@@ -97,7 +118,47 @@ export interface LeadRecord {
     lead_score: number;
     qualification: Qualification;
     qualification_reasons: string[];
+    dedupe_status: DedupeStatus;
+    first_seen_at: string;
+    last_seen_at: string;
+    times_seen: number;
+    official_website: string | null;
+    contact_candidate_url: string | null;
+    public_business_emails: string[];
+    public_business_phones: string[];
+    social_urls: string[];
+    contact_source_urls: string[];
+    contact_confidence: number;
+    contact_status: ContactStatus;
+    contact_error: string | null;
     scraped_at: string;
+}
+
+export interface ContactDetails {
+    official_website: string | null;
+    contact_candidate_url: string | null;
+    public_business_emails: string[];
+    public_business_phones: string[];
+    social_urls: string[];
+    contact_source_urls: string[];
+    contact_confidence: number;
+    contact_status: ContactStatus;
+    contact_error: string | null;
+}
+
+export interface SellerState {
+    fingerprint: string;
+    first_seen_at: string;
+    last_seen_at: string;
+    times_seen: number;
+    last_emitted_at?: string;
+    contact?: ContactDetails;
+    contact_enriched_at?: string;
+}
+
+export interface PersistentLeadState {
+    schema_version: '1.0';
+    sellers: Record<string, SellerState>;
 }
 
 export interface RunSummary {
@@ -108,6 +169,11 @@ export interface RunSummary {
     product_count: number;
     seller_count: number;
     qualified_lead_count: number;
+    emitted_lead_count: number;
+    duplicate_suppressed_count: number;
+    contact_enrichment_attempted: number;
+    contact_enrichment_verified: number;
+    contact_enrichment_cached: number;
     started_at: string;
     finished_at?: string;
 }
