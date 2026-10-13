@@ -80,8 +80,9 @@ function cacheFresh(enrichedAt: string | undefined, cacheDays: number, now: stri
 
 function businessLike(lead: LeadRecord): boolean {
     if (lead.is_official_store) return true;
-    const words = lead.display_name?.trim().split(/\s+/).filter(Boolean) ?? [];
-    return words.length >= 2 || /store|shop|boutique|resale|luxury|collective|archive|vintage|\.com/i.test(lead.display_name ?? '');
+    if (lead.seller_segment === 'B2C') return true;
+    const words = lead.seller_name?.trim().split(/\s+/).filter(Boolean) ?? [];
+    return words.length >= 2 || /store|shop|boutique|resale|luxury|collective|archive|vintage|\.com/i.test(lead.seller_name ?? '');
 }
 
 function normalizeText(value: string): string {
@@ -322,7 +323,7 @@ async function searchOfficialWebsites(
     leads: LeadRecord[],
     input: NormalizedInput,
 ): Promise<Map<string, OrganicResult[]>> {
-    const queries = leads.map((lead) => `"${lead.display_name}" official website luxury resale`).join('\n');
+    const queries = leads.map((lead) => `"${lead.seller_name}" official website luxury resale`).join('\n');
     const run = await Actor.call(
         input.contactSearchActorId,
         {
@@ -346,7 +347,7 @@ async function searchOfficialWebsites(
     items.forEach((item, index) => {
         const page = item as SearchResultPage;
         const term = page.searchQuery?.term;
-        const lead = (term && leads.find((candidate) => term.includes(candidate.display_name ?? ''))) ?? leads[index];
+        const lead = (term && leads.find((candidate) => term.includes(candidate.seller_name ?? ''))) ?? leads[index];
         if (lead) result.set(lead.seller_id, page.organicResults ?? []);
     });
     return result;
@@ -379,7 +380,7 @@ export async function enrichContacts(
             (lead) =>
                 lead.contact_status === 'not_requested' &&
                 lead.lead_score >= input.minLeadScoreForEnrichment &&
-                Boolean(lead.display_name) &&
+                Boolean(lead.seller_name) &&
                 businessLike(lead),
         )
         .sort((left, right) => right.lead_score - left.lead_score)
@@ -426,7 +427,7 @@ export async function enrichContacts(
 
         for (const organicResult of organicResults.slice(0, 5)) {
             try {
-                const inspection = await inspectWebsite(lead.display_name as string, organicResult);
+                const inspection = await inspectWebsite(lead.seller_name as string, organicResult);
                 const contact = contactFromInspection(inspection, input.minContactConfidence);
                 if (contact.contact_confidence > best.contact_confidence) best = contact;
                 if (contact.contact_status === 'verified') break;

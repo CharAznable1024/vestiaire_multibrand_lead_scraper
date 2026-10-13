@@ -1,10 +1,10 @@
 {
   "$schema": "https://apify.com/schemas/v1/actor.ide.json",
   "actorSpecification": 1,
-  "name": "vestiaire-multibrand-lead-scraper",
-  "title": "Vestiaire Multi-brand Lead Scraper",
-  "description": "Find public Vestiaire seller leads that list products across multiple searched brands.",
-  "version": "0.1",
+  "name": "vestiaire-merchant-lead-scraper",
+  "title": "Vestiaire Merchant Lead Scraper",
+  "description": "Discover Vestiaire merchant leads with public seller sales, inventory, profile, category, country, and business contact evidence.",
+  "version": "0.2",
   "meta": {
     "templateId": "ts-crawlee-playwright-chrome",
     "generatedBy": "TRAE with GPT-5"

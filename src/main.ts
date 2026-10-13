@@ -1,28 +1,26 @@
 import { PlaywrightCrawler } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
 
-import { normalizeInput } from './input.js';
 import { enrichContacts } from './contact-enrichment.js';
 import { applyCrossRunDedupe, normalizePersistentState } from './dedupe.js';
-import { buildLeads, countSellers } from './leads.js';
+import { normalizeInput } from './input.js';
+import { aggregateSellers, buildMerchantLeads, countSellers } from './leads.js';
 import { searchUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
 import { captureSearchResponse, fetchSearchPage } from './search.js';
-import type {
-    ActorInput,
-    CapturedSearchResponse,
-    ProductRecord,
-    RawSearchResponse,
-    RunSummary,
-} from './types.js';
+import { parseSellerDetailNextData } from './seller-detail.js';
+import type { ActorInput, CapturedSearchResponse, ProductRecord, RawSearchResponse, RunSummary, SellerDetail } from './types.js';
 
 await Actor.init();
 
 const input = normalizeInput(await Actor.getInput<ActorInput>());
 const startedAt = new Date().toISOString();
 const productsById = new Map<string, ProductRecord>();
-const failedBrands: Array<{ brand: string; error: string }> = [];
+const sellerDetails = new Map<string, SellerDetail>();
+const failedSources: Array<{ source: string; error: string }> = [];
+const failedSellerDetails = new Set<string>();
 const capturedResponses = new Map<string, Promise<CapturedSearchResponse>>();
+let sellerDetailAttempted = 0;
 let qualifiedLeadCount = 0;
 let emittedLeadCount = 0;
 let duplicateSuppressedCount = 0;
@@ -36,11 +34,15 @@ function responseKey(request: { id?: string; uniqueKey: string }): string {
 
 const summary = (status: RunSummary['status']): RunSummary => ({
     status,
-    schema_version: '1.0',
-    searched_brands: input.brands,
-    failed_brands: failedBrands,
-    product_count: productsById.size,
+    schema_version: '2.0',
+    search_queries: input.searchQueries,
+    start_urls: input.startUrls,
+    failed_sources: failedSources,
+    listing_count: productsById.size,
     seller_count: countSellers([...productsById.values()]),
+    seller_detail_attempted: sellerDetailAttempted,
+    seller_detail_succeeded: sellerDetails.size,
+    seller_detail_failed: failedSellerDetails.size,
     qualified_lead_count: qualifiedLeadCount,
     emitted_lead_count: emittedLeadCount,
     duplicate_suppressed_count: duplicateSuppressedCount,
@@ -69,7 +71,7 @@ const proxyConfiguration = wantsProxy
       })
     : undefined;
 
-const crawler = new PlaywrightCrawler({
+const searchCrawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxConcurrency: input.maxConcurrency,
     maxRequestRetries: input.maxRequestRetries,
@@ -77,81 +79,107 @@ const crawler = new PlaywrightCrawler({
     navigationTimeoutSecs: input.navigationTimeoutSecs,
     useSessionPool: true,
     persistCookiesPerSession: true,
-    launchContext: {
-        launchOptions: {
-            headless: true,
-            args: ['--disable-gpu'],
-        },
-    },
+    launchContext: { launchOptions: { headless: true, args: ['--disable-gpu'] } },
     preNavigationHooks: [async ({ page, request }, gotoOptions) => {
         gotoOptions.waitUntil = 'domcontentloaded';
         const responsePromise = captureSearchResponse(page, input.navigationTimeoutSecs * 1_000);
-        // A blocked navigation can close the page before requestHandler awaits this promise.
-        // Attach a rejection handler immediately to prevent an unhandled rejection; the
-        // original promise remains rejected and is still handled normally by requestHandler.
         void responsePromise.catch(() => undefined);
         capturedResponses.set(responseKey(request), responsePromise);
     }],
     requestHandler: async ({ page, request }) => {
-        const brand = String(request.userData.brand);
-        log.info('Processing brand search', { brand, url: request.loadedUrl });
-
+        const source = String(request.userData.source);
+        log.info('Processing listing source', { source, url: request.loadedUrl });
         const key = responseKey(request);
-        const capturedPromise = capturedResponses.get(key);
-        if (!capturedPromise) throw new Error(`Missing search response listener for ${brand}`);
+        const captured = await capturedResponses.get(key);
+        if (!captured) throw new Error(`Missing search response listener for ${source}`);
 
-        const captured = await capturedPromise;
         const pages: RawSearchResponse[] = [captured.data];
         const totalPages = Math.max(1, Math.trunc(captured.data.paginationStats?.totalPages ?? 1));
-        const pageLimit = Math.min(totalPages, input.maxPagesPerBrand);
+        const pageLimit = Math.min(totalPages, input.maxPagesPerQuery);
         const firstPageSize = Math.max(1, captured.data.items?.length ?? 48);
-
         for (let pageNumber = 1; pageNumber < pageLimit; pageNumber += 1) {
-            const currentCount = pages.reduce((sum, result) => sum + (result.items?.length ?? 0), 0);
-            if (currentCount >= input.maxItemsPerBrand) break;
+            const count = pages.reduce((sum, result) => sum + (result.items?.length ?? 0), 0);
+            if (count >= input.maxListingsPerQuery) break;
             pages.push(await fetchSearchPage(page, captured, pageNumber * firstPageSize));
         }
 
-        const scrapedAt = new Date().toISOString();
-        const rawItems = pages.flatMap((result) => result.items ?? []).slice(0, input.maxItemsPerBrand);
+        const rawItems = pages.flatMap((result) => result.items ?? []).slice(0, input.maxListingsPerQuery);
         let normalizedCount = 0;
-
         for (const rawItem of rawItems) {
-            const product = normalizeProduct(rawItem, brand, input.country, scrapedAt);
+            const product = normalizeProduct(rawItem, source, input.country);
             if (!product) continue;
             productsById.set(product.item_id, product);
             normalizedCount += 1;
         }
-
-        log.info('Brand search completed', { brand, rawItems: rawItems.length, normalizedProducts: normalizedCount });
+        log.info('Listing source completed', { source, rawItems: rawItems.length, normalizedProducts: normalizedCount });
         capturedResponses.delete(key);
     },
     failedRequestHandler: async ({ request }, error) => {
-        const brand = String(request.userData.brand);
+        const source = String(request.userData.source);
         const message = error instanceof Error ? error.message : String(error);
-        failedBrands.push({ brand, error: message.slice(0, 500) });
+        failedSources.push({ source, error: message.slice(0, 500) });
         capturedResponses.delete(responseKey(request));
-        log.error('Brand search failed', { brand, error: message });
+        log.error('Listing source failed', { source, error: message });
     },
 });
 
-await crawler.run(
-    input.brands.map((brand) => ({
-        url: searchUrl(brand, input.country),
-        uniqueKey: `brand:${input.country}:${brand.toLowerCase()}`,
-        userData: { brand },
+const listingSources = [
+    ...input.searchQueries.map((query) => ({
+        url: searchUrl(query, input.country),
+        uniqueKey: `query:${input.country}:${query.toLowerCase()}`,
+        userData: { source: query },
+    })),
+    ...input.startUrls.map((url) => ({
+        url,
+        uniqueKey: `url:${url}`,
+        userData: { source: url },
+    })),
+];
+await searchCrawler.run(listingSources);
+
+if (failedSources.length === listingSources.length) {
+    await Actor.setValue('OUTPUT', summary('FAILED'));
+    throw new Error('All listing sources failed. Review OUTPUT and run logs.');
+}
+
+const aggregates = aggregateSellers([...productsById.values()]).slice(0, input.maxSellers);
+sellerDetailAttempted = aggregates.length;
+const detailCrawler = new PlaywrightCrawler({
+    proxyConfiguration,
+    maxConcurrency: input.maxSellerDetailConcurrency,
+    maxRequestRetries: input.maxRequestRetries,
+    requestHandlerTimeoutSecs: input.navigationTimeoutSecs + 30,
+    navigationTimeoutSecs: input.navigationTimeoutSecs,
+    useSessionPool: true,
+    persistCookiesPerSession: true,
+    launchContext: { launchOptions: { headless: true, args: ['--disable-gpu'] } },
+    requestHandler: async ({ page, request }) => {
+        const sellerId = String(request.userData.sellerId);
+        const json = await page.locator('script#__NEXT_DATA__').textContent({ timeout: input.navigationTimeoutSecs * 1_000 });
+        if (!json) throw new Error('Product detail did not contain __NEXT_DATA__');
+        const detail = parseSellerDetailNextData(json, request.loadedUrl ?? request.url);
+        if (!detail) throw new Error('Could not parse public seller statistics from product detail');
+        if (detail.seller_id !== sellerId) throw new Error(`Seller ID mismatch: expected ${sellerId}, got ${detail.seller_id}`);
+        sellerDetails.set(sellerId, detail);
+        log.info('Seller detail enriched', { sellerId, itemsSold: detail.items_sold, country: detail.seller_country });
+    },
+    failedRequestHandler: async ({ request }, error) => {
+        const sellerId = String(request.userData.sellerId);
+        failedSellerDetails.add(sellerId);
+        log.warning('Seller detail unavailable', { sellerId, error: String(error) });
+    },
+});
+
+await detailCrawler.run(
+    aggregates.map((aggregate) => ({
+        url: aggregate.products[0].item_url,
+        uniqueKey: `seller-detail:${aggregate.seller_id}`,
+        userData: { sellerId: aggregate.seller_id },
     })),
 );
 
-if (failedBrands.length === input.brands.length) {
-    const output = summary('FAILED');
-    await Actor.setValue('OUTPUT', output);
-    throw new Error('All brand searches failed. Review OUTPUT and run logs; a residential proxy may be required.');
-}
-
-const products = [...productsById.values()];
 const scrapedAt = new Date().toISOString();
-const leads = buildLeads(products, input.country, input.minBrandCount, input.minListingsPerSeller, scrapedAt);
+const leads = buildMerchantLeads(aggregates, sellerDetails, input, input.country, scrapedAt);
 qualifiedLeadCount = leads.length;
 
 const stateStore = await Actor.openKeyValueStore(input.dedupeStoreName);
@@ -160,26 +188,12 @@ const contactResult = await enrichContacts(leads, input, previousState, scrapedA
 contactEnrichmentAttempted = contactResult.attempted;
 contactEnrichmentVerified = contactResult.verified;
 contactEnrichmentCached = contactResult.cached;
-
-const dedupeResult = applyCrossRunDedupe(
-    contactResult.leads,
-    previousState,
-    input.dedupeMode,
-    input.reemitAfterDays,
-    scrapedAt,
-);
+const dedupeResult = applyCrossRunDedupe(contactResult.leads, previousState, input.dedupeMode, input.reemitAfterDays, scrapedAt);
 emittedLeadCount = dedupeResult.emitted.length;
 duplicateSuppressedCount = dedupeResult.suppressed;
 await stateStore.setValue('STATE', dedupeResult.state);
 
 if (dedupeResult.emitted.length) await Actor.pushData(dedupeResult.emitted);
-if (input.includeProducts && products.length) await Actor.pushData(products);
-
-const output: RunSummary = {
-    ...summary('SUCCEEDED'),
-    finished_at: new Date().toISOString(),
-};
-await Actor.setValue('OUTPUT', output);
-
-log.info('Run completed', output);
+await Actor.setValue('OUTPUT', { ...summary('SUCCEEDED'), finished_at: new Date().toISOString() });
+log.info('Run completed', summary('SUCCEEDED'));
 await Actor.exit();

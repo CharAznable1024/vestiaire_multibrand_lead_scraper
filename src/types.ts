@@ -1,7 +1,8 @@
 export type Market = 'US' | 'GB' | 'FR' | 'DE' | 'IT' | 'ES';
 export type DedupeMode = 'all' | 'new_only' | 'new_and_updated';
 export type DedupeStatus = 'new' | 'updated' | 'seen';
-export type ContactStatus = 'not_requested' | 'not_eligible' | 'cached' | 'not_found' | 'candidate' | 'verified' | 'error';
+export type ContactStatus = 'not_requested' | 'not_eligible' | 'not_found' | 'candidate' | 'verified' | 'error';
+export type SellerSegment = 'B2C' | 'C2C' | 'UNKNOWN';
 
 export interface ProxyInput {
     useApifyProxy?: boolean;
@@ -11,14 +12,18 @@ export interface ProxyInput {
 }
 
 export interface ActorInput {
-    brands?: unknown;
+    searchQueries?: unknown;
+    startUrls?: unknown;
     country?: unknown;
-    maxItemsPerBrand?: unknown;
-    maxPagesPerBrand?: unknown;
-    minBrandCount?: unknown;
-    minListingsPerSeller?: unknown;
-    includeProducts?: unknown;
+    maxListingsPerQuery?: unknown;
+    maxPagesPerQuery?: unknown;
+    maxSellers?: unknown;
+    minItemsSold?: unknown;
+    minItemsListed?: unknown;
+    allowedSellerSegments?: unknown;
+    requireSellerDetails?: unknown;
     maxConcurrency?: unknown;
+    maxSellerDetailConcurrency?: unknown;
     maxRequestRetries?: unknown;
     navigationTimeoutSecs?: unknown;
     proxyConfiguration?: unknown;
@@ -34,14 +39,18 @@ export interface ActorInput {
 }
 
 export interface NormalizedInput {
-    brands: string[];
+    searchQueries: string[];
+    startUrls: string[];
     country: Market;
-    maxItemsPerBrand: number;
-    maxPagesPerBrand: number;
-    minBrandCount: number;
-    minListingsPerSeller: number;
-    includeProducts: boolean;
+    maxListingsPerQuery: number;
+    maxPagesPerQuery: number;
+    maxSellers: number;
+    minItemsSold: number;
+    minItemsListed: number;
+    allowedSellerSegments: SellerSegment[];
+    requireSellerDetails: boolean;
     maxConcurrency: number;
+    maxSellerDetailConcurrency: number;
     maxRequestRetries: number;
     navigationTimeoutSecs: number;
     proxyConfiguration: ProxyInput;
@@ -58,9 +67,7 @@ export interface NormalizedInput {
 
 export interface RawSearchResponse {
     items?: unknown[];
-    paginationStats?: {
-        totalPages?: number;
-    };
+    paginationStats?: { totalPages?: number };
 }
 
 export interface CapturedSearchResponse {
@@ -71,50 +78,85 @@ export interface CapturedSearchResponse {
 }
 
 export interface ProductRecord {
-    record_type: 'product';
-    schema_version: '1.0';
-    source_site: 'vestiaire_collective';
-    search_brand: string;
+    source_query: string;
     item_id: string;
     title: string;
     brand: string | null;
-    description: string | null;
+    category: string | null;
+    category_path: string[];
     country: string | null;
     item_url: string;
     price_amount: number | null;
     price_currency: string | null;
-    original_price_amount: number | null;
     likes: number;
-    sold: boolean;
-    stock: boolean | number | string | null;
-    colors: string[];
-    image_urls: string[];
     seller_id: string | null;
     seller_display_name: string | null;
     seller_badge: string | null;
     is_official_store: boolean;
-    seller_profile_url: string | null;
-    scraped_at: string;
+}
+
+export interface SellerDetail {
+    seller_id: string;
+    seller_name: string | null;
+    seller_username: string | null;
+    seller_segment: SellerSegment;
+    seller_country: string | null;
+    seller_country_code: string | null;
+    seller_badge: string | null;
+    badges: string[];
+    items_sold: number | null;
+    items_listed: number | null;
+    items_bought: number | null;
+    items_wished: number | null;
+    pass_rate: number | null;
+    vacation_active: boolean | null;
+    detail_category: string | null;
+    detail_source_url: string;
+}
+
+export interface SellerAggregate {
+    seller_id: string;
+    display_name: string | null;
+    search_badge: string | null;
+    is_official_store: boolean;
+    countries: string[];
+    brands: string[];
+    categories: string[];
+    source_queries: string[];
+    products: ProductRecord[];
 }
 
 export type Qualification = 'high' | 'medium' | 'low';
 
 export interface LeadRecord {
     record_type: 'merchant_lead';
-    schema_version: '1.0';
+    schema_version: '2.0';
     seller_id: string;
-    display_name: string | null;
+    seller_name: string | null;
+    seller_username: string | null;
+    profile_url: string;
+    seller_segment: SellerSegment;
+    seller_country: string | null;
+    seller_country_code: string | null;
+    items_sold: number | null;
+    items_listed: number | null;
+    items_bought: number | null;
+    items_wished: number | null;
+    pass_rate: number | null;
     seller_badge: string | null;
+    badges: string[];
     is_official_store: boolean;
-    countries: string[];
+    vacation_active: boolean | null;
+    categories: string[];
     brands: string[];
-    brand_count: number;
-    listing_count: number;
+    source_queries: string[];
+    sample_listing_count: number;
     total_likes: number;
     average_price: number | null;
     price_currency: string | null;
     sample_product_urls: string[];
-    profile_url: string;
+    seller_detail_source_url: string | null;
+    seller_detail_status: 'enriched' | 'unavailable';
     lead_score: number;
     qualification: Qualification;
     qualification_reasons: string[];
@@ -157,17 +199,21 @@ export interface SellerState {
 }
 
 export interface PersistentLeadState {
-    schema_version: '1.0';
+    schema_version: '2.0';
     sellers: Record<string, SellerState>;
 }
 
 export interface RunSummary {
     status: 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'ABORTED';
-    schema_version: '1.0';
-    searched_brands: string[];
-    failed_brands: Array<{ brand: string; error: string }>;
-    product_count: number;
+    schema_version: '2.0';
+    search_queries: string[];
+    start_urls: string[];
+    failed_sources: Array<{ source: string; error: string }>;
+    listing_count: number;
     seller_count: number;
+    seller_detail_attempted: number;
+    seller_detail_succeeded: number;
+    seller_detail_failed: number;
     qualified_lead_count: number;
     emitted_lead_count: number;
     duplicate_suppressed_count: number;

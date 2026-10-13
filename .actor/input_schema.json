@@ -1,98 +1,134 @@
 {
   "$schema": "https://apify.com/schemas/v1/input.ide.json",
-  "title": "Vestiaire multi-brand lead search",
-  "description": "Search public Vestiaire listings for several brands and aggregate sellers that appear across those brands.",
+  "title": "Vestiaire merchant lead discovery",
+  "description": "Discover Vestiaire sellers from public search/category listings, enrich public seller statistics, and output one merchant lead per seller.",
   "type": "object",
   "schemaVersion": 1,
   "properties": {
-    "brands": {
-      "title": "Brands or search phrases",
+    "searchQueries": {
+      "title": "Search queries",
       "type": "array",
-      "description": "Distinct brand names or public search phrases. Use 3-5 focused brands for the first run.",
+      "description": "Brands, categories, or product phrases used to discover sellers.",
       "editor": "stringList",
       "default": ["Gucci", "Chanel", "Louis Vuitton"],
       "prefill": ["Gucci", "Chanel", "Louis Vuitton"],
-      "minItems": 1,
       "maxItems": 20,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "startUrls": {
+      "title": "Filtered Vestiaire URLs",
+      "type": "array",
+      "description": "Optional public Vestiaire search, brand, or category URLs. Existing URL filters are preserved.",
+      "editor": "requestListSources",
+      "default": [],
+      "prefill": []
     },
     "country": {
       "title": "Market",
       "type": "string",
-      "description": "Vestiaire market used for URLs and localized pricing.",
+      "description": "Vestiaire market used for search URLs and localized prices.",
       "editor": "select",
       "default": "US",
       "enum": ["US", "GB", "FR", "DE", "IT", "ES"],
       "enumTitles": ["United States", "United Kingdom", "France", "Germany", "Italy", "Spain"]
     },
-    "maxItemsPerBrand": {
-      "title": "Maximum listings per brand",
+    "maxListingsPerQuery": {
+      "title": "Maximum listings per source",
       "type": "integer",
-      "description": "Maximum public listing cards retained for each brand.",
+      "description": "Maximum listing cards sampled from each query or start URL.",
       "editor": "number",
       "default": 48,
       "minimum": 1,
       "maximum": 500
     },
-    "maxPagesPerBrand": {
-      "title": "Maximum pages per brand",
+    "maxPagesPerQuery": {
+      "title": "Maximum pages per source",
       "type": "integer",
-      "description": "Safety cap for search pagination. Vestiaire typically returns up to 48 listings per page.",
-      "editor": "number",
-      "default": 2,
-      "minimum": 1,
-      "maximum": 10
-    },
-    "minBrandCount": {
-      "title": "Minimum distinct brands per seller",
-      "type": "integer",
-      "description": "Only output sellers represented in at least this many searched brands.",
-      "editor": "number",
-      "default": 2,
-      "minimum": 1,
-      "maximum": 20
-    },
-    "minListingsPerSeller": {
-      "title": "Minimum matching listings per seller",
-      "type": "integer",
-      "description": "Only output sellers with at least this many matching listings in the sampled results.",
-      "editor": "number",
-      "default": 2,
-      "minimum": 1,
-      "maximum": 100
-    },
-    "includeProducts": {
-      "title": "Include normalized product rows",
-      "type": "boolean",
-      "description": "Also write the product evidence used to build leads to the default Dataset.",
-      "editor": "checkbox",
-      "default": false
-    },
-    "maxConcurrency": {
-      "title": "Browser concurrency",
-      "type": "integer",
-      "description": "Parallel brand search pages. Keep between 1 and 3 to reduce blocking.",
+      "description": "Hard pagination cap for every discovery source.",
       "editor": "number",
       "default": 1,
       "minimum": 1,
-      "maximum": 3
+      "maximum": 10
+    },
+    "maxSellers": {
+      "title": "Maximum sellers to inspect",
+      "type": "integer",
+      "description": "Hard cap on unique seller detail pages. One representative product detail is opened per seller.",
+      "editor": "number",
+      "default": 50,
+      "minimum": 1,
+      "maximum": 200,
+      "sectionCaption": "Seller qualification"
+    },
+    "minItemsSold": {
+      "title": "Minimum public items sold",
+      "type": "integer",
+      "description": "Only output sellers whose public products_sold statistic meets this threshold.",
+      "editor": "number",
+      "default": 5,
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "minItemsListed": {
+      "title": "Minimum public items listed",
+      "type": "integer",
+      "description": "Only output sellers whose public products_listed statistic meets this threshold.",
+      "editor": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "allowedSellerSegments": {
+      "title": "Allowed seller segments",
+      "type": "array",
+      "description": "Filter by Vestiaire public seller segment. Keep UNKNOWN to retain sellers without a published segment.",
+      "editor": "select",
+      "default": ["B2C", "C2C", "UNKNOWN"],
+      "items": {
+        "type": "string",
+        "enum": ["B2C", "C2C", "UNKNOWN"],
+        "enumTitles": ["Business seller (B2C)", "Consumer seller (C2C)", "Unknown"]
+      }
+    },
+    "requireSellerDetails": {
+      "title": "Require seller statistics",
+      "type": "boolean",
+      "description": "Exclude sellers when a representative product detail cannot provide public seller statistics.",
+      "editor": "checkbox",
+      "default": true
+    },
+    "maxConcurrency": {
+      "title": "Discovery concurrency",
+      "type": "integer",
+      "description": "Parallel search/category pages.",
+      "editor": "number",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 3,
+      "sectionCaption": "Run controls"
+    },
+    "maxSellerDetailConcurrency": {
+      "title": "Seller detail concurrency",
+      "type": "integer",
+      "description": "Parallel representative product detail pages.",
+      "editor": "number",
+      "default": 3,
+      "minimum": 1,
+      "maximum": 5
     },
     "maxRequestRetries": {
       "title": "Maximum retries",
       "type": "integer",
-      "description": "Maximum browser retries for a failed brand search.",
+      "description": "Maximum retries for a blocked or failed page.",
       "editor": "number",
       "default": 2,
       "minimum": 0,
       "maximum": 5
     },
     "navigationTimeoutSecs": {
-      "title": "Search response timeout",
+      "title": "Page timeout",
       "type": "integer",
-      "description": "Seconds to wait for the public product-search response.",
+      "description": "Seconds to wait for search responses and seller detail data.",
       "editor": "number",
       "default": 60,
       "minimum": 15,
@@ -101,24 +137,25 @@
     "dedupeMode": {
       "title": "Cross-run deduplication mode",
       "type": "string",
-      "description": "all emits every qualified lead; new_only emits unseen sellers; new_and_updated emits unseen sellers and sellers whose stable business/contact fields changed.",
+      "description": "Control whether all, only new, or new and updated sellers are emitted.",
       "editor": "select",
       "default": "new_and_updated",
       "enum": ["all", "new_only", "new_and_updated"],
-      "enumTitles": ["All qualified leads", "New sellers only", "New and updated sellers"]
+      "enumTitles": ["All qualified leads", "New sellers only", "New and updated sellers"],
+      "sectionCaption": "Cross-run deduplication"
     },
     "dedupeStoreName": {
-      "title": "Persistent deduplication store",
+      "title": "Persistent state store",
       "type": "string",
-      "description": "Named Apify key-value store used across runs. Use a different name to isolate independent campaigns.",
+      "description": "Named key-value store shared across runs. Use a separate name per campaign.",
       "editor": "textfield",
-      "default": "vestiaire-multibrand-lead-state",
+      "default": "vestiaire-merchant-lead-state-v2",
       "pattern": "^[a-zA-Z0-9._-]{3,63}$"
     },
     "reemitAfterDays": {
       "title": "Re-emit unchanged leads after days",
       "type": "integer",
-      "description": "Emit an otherwise unchanged seller after this many days. Set to 0 to never re-emit unchanged leads.",
+      "description": "Set to 0 to never periodically re-emit unchanged sellers.",
       "editor": "number",
       "default": 30,
       "minimum": 0,
@@ -127,34 +164,34 @@
     "contactEnrichment": {
       "title": "Enrich public business contacts",
       "type": "boolean",
-      "description": "Discover likely official websites using Apify Google Search and extract only publicly displayed business emails, phone numbers, and social links from the website.",
+      "description": "Discover likely official websites and extract public business contact links.",
       "editor": "checkbox",
       "default": true,
       "sectionCaption": "Public business contact enrichment",
-      "sectionDescription": "This starts a paid Google Search Actor run for eligible leads. It does not use Google's personal-lead enrichment and does not attempt to identify private individuals."
+      "sectionDescription": "Starts a paid Google Search Actor run for eligible leads. Personal-lead enrichment remains disabled."
     },
     "maxContactEnrichmentLeads": {
       "title": "Maximum leads to enrich",
       "type": "integer",
-      "description": "Maximum highest-scoring leads searched per run. Each uncached lead can add one Google search page plus public website requests.",
+      "description": "Maximum highest-scoring uncached leads searched per run.",
       "editor": "number",
       "default": 10,
       "minimum": 0,
       "maximum": 50
     },
     "minLeadScoreForEnrichment": {
-      "title": "Minimum lead score for enrichment",
+      "title": "Minimum lead score for contacts",
       "type": "integer",
-      "description": "Only leads at or above this lead score are considered for contact enrichment.",
+      "description": "Only leads at or above this score are considered for public website discovery.",
       "editor": "number",
       "default": 50,
       "minimum": 0,
       "maximum": 100
     },
     "minContactConfidence": {
-      "title": "Minimum verified contact confidence",
+      "title": "Verified contact confidence",
       "type": "integer",
-      "description": "Minimum evidence score required before a candidate website and its public contacts are marked verified.",
+      "description": "Minimum evidence score for a verified official website and contacts.",
       "editor": "number",
       "default": 80,
       "minimum": 0,
@@ -163,32 +200,28 @@
     "contactCacheDays": {
       "title": "Contact cache duration",
       "type": "integer",
-      "description": "Reuse contact evidence from the persistent state store for this many days before searching again.",
+      "description": "Reuse public contact evidence for this many days.",
       "editor": "number",
       "default": 30,
       "minimum": 0,
       "maximum": 3650
     },
     "contactSearchActorId": {
-      "title": "Search Actor ID",
+      "title": "Website search Actor",
       "type": "string",
-      "description": "Apify Actor used only to discover candidate official websites. Changing it requires compatible Google organic-result output.",
+      "description": "Compatible Google organic-result Actor used for official website discovery.",
       "editor": "textfield",
       "default": "apify/google-search-scraper"
     },
     "proxyConfiguration": {
       "title": "Proxy configuration",
       "type": "object",
-      "description": "Standard Apify proxy settings. Residential proxy matching the selected market is recommended for stable cloud runs.",
+      "description": "Standard Apify proxy settings. Residential proxy is optional and adds cost.",
       "editor": "proxy",
-      "default": {
-        "useApifyProxy": false
-      },
-      "prefill": {
-        "useApifyProxy": false
-      }
+      "default": { "useApifyProxy": false },
+      "prefill": { "useApifyProxy": false }
     }
   },
-  "required": ["brands"],
+  "required": [],
   "additionalProperties": false
 }

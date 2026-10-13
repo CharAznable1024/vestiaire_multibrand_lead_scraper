@@ -1,9 +1,9 @@
 {
-  "name": "vestiaire-multibrand-lead-scraper",
-  "version": "0.1.0",
+  "name": "vestiaire-merchant-lead-scraper",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Apify Actor that identifies multi-brand Vestiaire Collective seller leads.",
+  "description": "Apify Actor that discovers Vestiaire merchant leads with public seller statistics and contact evidence.",
   "engines": {
     "node": ">=22"
   },

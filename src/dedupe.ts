@@ -16,13 +16,13 @@ export interface DedupeResult {
 }
 
 export function emptyPersistentState(): PersistentLeadState {
-    return { schema_version: '1.0', sellers: {} };
+    return { schema_version: '2.0', sellers: {} };
 }
 
 export function normalizePersistentState(value: unknown): PersistentLeadState {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return emptyPersistentState();
     const candidate = value as Partial<PersistentLeadState>;
-    if (candidate.schema_version !== '1.0' || !candidate.sellers || typeof candidate.sellers !== 'object') {
+    if (candidate.schema_version !== '2.0' || !candidate.sellers || typeof candidate.sellers !== 'object') {
         return emptyPersistentState();
     }
     return candidate as PersistentLeadState;
@@ -44,10 +44,15 @@ export function contactFromLead(lead: LeadRecord): ContactDetails {
 
 export function leadFingerprint(lead: LeadRecord): string {
     const stable = {
-        display_name: lead.display_name,
+        seller_name: lead.seller_name,
+        seller_username: lead.seller_username,
+        seller_segment: lead.seller_segment,
+        seller_country: lead.seller_country,
+        seller_country_code: lead.seller_country_code,
+        items_sold: lead.items_sold,
+        items_listed: lead.items_listed,
         seller_badge: lead.seller_badge,
-        is_official_store: lead.is_official_store,
-        countries: [...lead.countries].sort(),
+        categories: [...lead.categories].sort(),
         brands: [...lead.brands].sort(),
         official_website: lead.official_website,
         public_business_emails: [...lead.public_business_emails].sort(),
@@ -72,7 +77,7 @@ export function applyCrossRunDedupe(
     now: string,
 ): DedupeResult {
     const nextState: PersistentLeadState = {
-        schema_version: '1.0',
+        schema_version: '2.0',
         sellers: { ...previousState.sellers },
     };
     const emitted: LeadRecord[] = [];
