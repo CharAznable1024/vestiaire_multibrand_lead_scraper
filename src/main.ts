@@ -72,7 +72,13 @@ const wantsProxy = useApifyMarketProxy || usesCustomProxyUrls;
 const proxyConfiguration = wantsProxy
     ? await Actor.createProxyConfiguration({
           ...proxyInput,
-          ...(useApifyMarketProxy ? { useApifyProxy: true, apifyProxyCountry: proxyInput.apifyProxyCountry ?? marketProxyCountry(input.country) } : {}),
+          ...(useApifyMarketProxy
+              ? {
+                    useApifyProxy: true,
+                    apifyProxyGroups: proxyInput.apifyProxyGroups?.length ? proxyInput.apifyProxyGroups : ['RESIDENTIAL'],
+                    apifyProxyCountry: proxyInput.apifyProxyCountry ?? marketProxyCountry(input.country),
+                }
+              : {}),
           checkAccess: true,
       })
     : undefined;
@@ -80,6 +86,7 @@ log.info('Market routing configured', {
     market: input.country,
     autoMarketProxy: input.autoMarketProxy,
     proxyMode: usesCustomProxyUrls ? 'custom_urls' : useApifyMarketProxy ? 'apify_market_proxy' : 'disabled',
+    proxyGroups: usesCustomProxyUrls ? undefined : proxyInput.apifyProxyGroups?.length ? proxyInput.apifyProxyGroups : ['RESIDENTIAL'],
     proxyCountry: usesCustomProxyUrls ? undefined : proxyInput.apifyProxyCountry ?? marketProxyCountry(input.country),
 });
 

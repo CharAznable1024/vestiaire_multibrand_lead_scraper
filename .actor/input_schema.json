@@ -162,7 +162,7 @@
     "autoMarketProxy": {
       "title": "Use a proxy matched to the selected market",
       "type": "boolean",
-      "description": "Uses the standard Apify Proxy with the selected market's country for the browser session. Turn off only when custom proxy URLs already provide the correct market location.",
+      "description": "Uses the Apify Residential Proxy with the selected market's country for the browser session. Turn off only when custom proxy URLs already provide the correct market location.",
       "editor": "checkbox",
       "default": true
     },
@@ -248,7 +248,7 @@
     "proxyConfiguration": {
       "title": "Proxy configuration",
       "type": "object",
-      "description": "Optional custom Apify proxy settings. When automatic market proxy is enabled, the selected market country is used unless overridden here. Residential proxy can add cost.",
+      "description": "Optional custom Apify proxy settings. When automatic market proxy is enabled, the selected market country and Residential group are used unless overridden here. Residential proxy adds transfer cost.",
       "editor": "proxy",
       "default": { "useApifyProxy": false },
       "prefill": { "useApifyProxy": false }
