@@ -7,7 +7,7 @@ describe('normalizeInput', () => {
         const input = normalizeInput({ searchQueries: [' Gucci ', 'Gucci', 'handbags'] });
         expect(input.searchQueries).toEqual(['Gucci', 'handbags']);
         expect(input.maxListingsPerQuery).toBe(48);
-        expect(input.maxSellers).toBe(50);
+        expect(input.maxSellers).toBe(25);
         expect(input.minItemsSold).toBe(5);
         expect(input.dedupeStoreName).toBe('vestiaire-merchant-lead-state-v2');
     });

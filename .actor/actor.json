@@ -9,6 +9,11 @@
     "templateId": "ts-crawlee-playwright-chrome",
     "generatedBy": "TRAE with GPT-5"
   },
+  "defaultRunOptions": {
+    "build": "latest",
+    "timeoutSecs": 1800,
+    "memoryMbytes": 2048
+  },
   "inputSchema": "./input_schema.json",
   "outputSchema": "./output_schema.json",
   "storages": {

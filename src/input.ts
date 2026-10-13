@@ -84,7 +84,7 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         country,
         maxListingsPerQuery: integer(input.maxListingsPerQuery, 48, 1, 500, 'maxListingsPerQuery'),
         maxPagesPerQuery: integer(input.maxPagesPerQuery, 1, 1, 10, 'maxPagesPerQuery'),
-        maxSellers: integer(input.maxSellers, 50, 1, 200, 'maxSellers'),
+        maxSellers: integer(input.maxSellers, 25, 1, 200, 'maxSellers'),
         minItemsSold: integer(input.minItemsSold, 5, 0, 1_000_000, 'minItemsSold'),
         minItemsListed: integer(input.minItemsListed, 1, 0, 1_000_000, 'minItemsListed'),
         allowedSellerSegments,

@@ -55,7 +55,7 @@
       "type": "integer",
       "description": "Hard cap on unique seller detail pages. One representative product detail is opened per seller.",
       "editor": "number",
-      "default": 50,
+      "default": 25,
       "minimum": 1,
       "maximum": 200,
       "sectionCaption": "Seller qualification"

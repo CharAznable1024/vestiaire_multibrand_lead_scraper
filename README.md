@@ -36,7 +36,7 @@ No login is used. The Actor processes public listing and product-detail data. It
 | `startUrls` | empty | Optional filtered Vestiaire search/category/brand URLs. |
 | `maxListingsPerQuery` | 48 | Listing cards sampled per source. |
 | `maxPagesPerQuery` | 1 | Pagination cap per source. |
-| `maxSellers` | 50 | Maximum representative seller-detail pages. This is the main detail-cost cap. |
+| `maxSellers` | 25 | Maximum representative seller-detail pages. This is the main detail-cost cap. |
 | `minItemsSold` | 5 | Minimum public `products_sold`. |
 | `minItemsListed` | 1 | Minimum public `products_listed`. |
 | `allowedSellerSegments` | B2C, C2C, UNKNOWN | Allowed public seller segments. |
