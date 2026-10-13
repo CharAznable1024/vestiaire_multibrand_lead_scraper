@@ -104,7 +104,16 @@ const searchCrawler = new PlaywrightCrawler({
         for (let pageNumber = 1; pageNumber < pageLimit; pageNumber += 1) {
             const count = pages.reduce((sum, result) => sum + (result.items?.length ?? 0), 0);
             if (count >= input.maxListingsPerQuery) break;
-            pages.push(await fetchSearchPage(page, captured, pageNumber * firstPageSize));
+            try {
+                pages.push(await fetchSearchPage(page, captured, pageNumber * firstPageSize));
+            } catch (error) {
+                log.warning('Search pagination failed; keeping successfully captured pages', {
+                    source,
+                    pageNumber: pageNumber + 1,
+                    error: String(error),
+                });
+                break;
+            }
         }
 
         const rawItems = pages.flatMap((result) => result.items ?? []).slice(0, input.maxListingsPerQuery);

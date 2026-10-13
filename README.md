@@ -113,6 +113,8 @@ The main cost drivers are:
 
 Start with `maxSellers: 10-25` and contact enrichment capped at 3-5 leads.
 
+If Vestiaire rejects search-API pagination, the Actor keeps the successfully captured first page and logs a warning. For broader discovery without brand filters, provide several category `startUrls`; each category creates an independent browser-backed first-page sample.
+
 ## Local development
 
 ```bash
