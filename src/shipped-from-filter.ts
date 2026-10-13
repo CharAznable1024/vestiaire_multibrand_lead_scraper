@@ -21,10 +21,14 @@ export async function applyShippedFromFilter(
 ): Promise<CapturedSearchResponse> {
     if (!sellerCountries.length) throw new Error('At least one seller country is required');
 
-    const filterButton = page.getByRole('button', { name: /shipped from/i }).first();
+    let filterButton = page.locator('[data-cy="CATALOG.FILTERS.LOCATION.BUTTON"]').first();
+    if ((await filterButton.count()) === 0) filterButton = page.getByRole('button', { name: /shipped from/i }).first();
     if ((await filterButton.count()) === 0) throw new Error('The public Shipped From filter was not available on this search page');
 
-    await filterButton.click();
+    await filterButton.scrollIntoViewIfNeeded();
+    // Vestiaire can render a transparent sticky layer over the filter toolbar.
+    // The public button is already resolved above, so bypass only that layer.
+    await filterButton.click({ force: true, timeout: Math.min(timeoutMillis, 10_000) });
 
     const options = [];
     for (const countryCode of sellerCountries) {
