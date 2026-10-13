@@ -42,4 +42,12 @@ describe('merchant lead aggregation', () => {
         expect(buildMerchantLeads(aggregates, new Map([['seller-1', sellerDetail()]]), strict, 'US', 'now')).toEqual([]);
         expect(buildMerchantLeads(aggregates, new Map(), strict, 'US', 'now')).toEqual([]);
     });
+
+    it('filters by seller-detail country rather than listing-card country', () => {
+        const input = normalizeInput({ sellerCountries: ['GB'], minItemsSold: 0, minItemsListed: 0 });
+        const aggregates = aggregateSellers([product({ country: 'US' })]);
+        const details = new Map([['seller-1', sellerDetail({ seller_country: 'United Kingdom', seller_country_code: 'GB' })]]);
+
+        expect(buildMerchantLeads(aggregates, details, input, 'GB', 'now')).toHaveLength(1);
+    });
 });

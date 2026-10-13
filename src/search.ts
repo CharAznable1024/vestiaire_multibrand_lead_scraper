@@ -73,3 +73,21 @@ export async function fetchSearchPage(
     if (!response.ok()) throw new Error(`Search API returned HTTP ${response.status()}: ${text.slice(0, 200)}`);
     return JSON.parse(text) as RawSearchResponse;
 }
+
+export async function fetchSearchPageWithRetries(
+    page: Page,
+    captured: CapturedSearchResponse,
+    offset: number,
+    maxRetries: number,
+): Promise<RawSearchResponse> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        try {
+            return await fetchSearchPage(page, captured, offset);
+        } catch (error) {
+            lastError = error;
+            if (attempt < maxRetries) await page.waitForTimeout(750 * (attempt + 1));
+        }
+    }
+    throw lastError;
+}

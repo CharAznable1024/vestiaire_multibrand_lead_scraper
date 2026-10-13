@@ -5,9 +5,9 @@ import { enrichContacts } from './contact-enrichment.js';
 import { applyCrossRunDedupe, normalizePersistentState } from './dedupe.js';
 import { normalizeInput } from './input.js';
 import { aggregateSellers, buildMerchantLeads, countSellers } from './leads.js';
-import { marketCatalogUrl, searchUrl, sellerProfileUrl } from './market.js';
+import { marketCatalogUrl, marketProxyCountry, searchUrl, sellerProfileUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
-import { captureSearchResponse, fetchSearchPage } from './search.js';
+import { captureSearchResponse, fetchSearchPageWithRetries } from './search.js';
 import { parseProfileStatsText, parseSellerDetailNextData } from './seller-detail.js';
 import type { ActorInput, CapturedSearchResponse, ProductRecord, RawSearchResponse, RunSummary, SellerDetail } from './types.js';
 
@@ -66,14 +66,22 @@ Actor.on('aborting', async () => {
 await Actor.setValue('OUTPUT', summary('RUNNING'));
 
 const proxyInput = input.proxyConfiguration;
-const wantsProxy = proxyInput.useApifyProxy || (proxyInput.proxyUrls?.length ?? 0) > 0;
+const usesCustomProxyUrls = (proxyInput.proxyUrls?.length ?? 0) > 0;
+const useApifyMarketProxy = !usesCustomProxyUrls && (input.autoMarketProxy || proxyInput.useApifyProxy === true);
+const wantsProxy = useApifyMarketProxy || usesCustomProxyUrls;
 const proxyConfiguration = wantsProxy
     ? await Actor.createProxyConfiguration({
           ...proxyInput,
-          apifyProxyCountry: proxyInput.apifyProxyCountry ?? input.country,
+          ...(useApifyMarketProxy ? { useApifyProxy: true, apifyProxyCountry: proxyInput.apifyProxyCountry ?? marketProxyCountry(input.country) } : {}),
           checkAccess: true,
       })
     : undefined;
+log.info('Market routing configured', {
+    market: input.country,
+    autoMarketProxy: input.autoMarketProxy,
+    proxyMode: usesCustomProxyUrls ? 'custom_urls' : useApifyMarketProxy ? 'apify_market_proxy' : 'disabled',
+    proxyCountry: usesCustomProxyUrls ? undefined : proxyInput.apifyProxyCountry ?? marketProxyCountry(input.country),
+});
 
 const searchCrawler = new PlaywrightCrawler({
     proxyConfiguration,
@@ -105,7 +113,7 @@ const searchCrawler = new PlaywrightCrawler({
             const count = pages.reduce((sum, result) => sum + (result.items?.length ?? 0), 0);
             if (count >= input.maxListingsPerQuery) break;
             try {
-                pages.push(await fetchSearchPage(page, captured, pageNumber * firstPageSize));
+                pages.push(await fetchSearchPageWithRetries(page, captured, pageNumber * firstPageSize, input.maxRequestRetries));
             } catch (error) {
                 log.warning('Search pagination failed; keeping successfully captured pages', {
                     source,
@@ -156,18 +164,15 @@ if (failedSources.length === listingSources.length) {
 }
 
 const allAggregates = aggregateSellers([...productsById.values()]);
-const countryPrefilteredAggregates =
-    input.sellerCountries.length > 0
-        ? allAggregates.filter((aggregate) =>
-              aggregate.countries.some((country) => input.sellerCountries.includes(country.toUpperCase())),
-          )
-        : allAggregates;
 log.info('Seller candidates prepared', {
     discovered: allAggregates.length,
-    afterCountryPrefilter: countryPrefilteredAggregates.length,
+    candidateLimit: input.maxSellerDetailCandidates,
     sellerCountries: input.sellerCountries,
+    countryFilterStage: 'seller_detail',
 });
-const aggregates = countryPrefilteredAggregates.slice(0, input.maxSellers);
+// Listing-card country is a market/listing field and is not a reliable seller
+// location. Always enrich first, then filter on Seller Detail's country code.
+const aggregates = allAggregates.slice(0, input.maxSellerDetailCandidates);
 sellerDetailAttempted = aggregates.length;
 const detailCrawler = new PlaywrightCrawler({
     proxyConfiguration,
@@ -237,7 +242,7 @@ await detailCrawler.run(
 );
 
 const scrapedAt = new Date().toISOString();
-const leads = buildMerchantLeads(aggregates, sellerDetails, input, input.country, scrapedAt);
+const leads = buildMerchantLeads(aggregates, sellerDetails, input, input.country, scrapedAt).slice(0, input.maxSellers);
 qualifiedLeadCount = leads.length;
 
 const stateStore = await Actor.openKeyValueStore(input.dedupeStoreName);

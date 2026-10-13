@@ -60,14 +60,23 @@
       "maximum": 10
     },
     "maxSellers": {
-      "title": "Maximum sellers to inspect",
+      "title": "Maximum qualified sellers to output",
       "type": "integer",
-      "description": "Hard cap on unique seller detail pages. One representative product detail is opened per seller.",
+      "description": "Maximum qualified merchant leads written to the Dataset after seller-detail filters are applied.",
       "editor": "number",
       "default": 25,
       "minimum": 1,
       "maximum": 200,
       "sectionCaption": "Seller qualification"
+    },
+    "maxSellerDetailCandidates": {
+      "title": "Maximum seller detail candidates",
+      "type": "integer",
+      "description": "Maximum unique sellers whose public detail pages are inspected before country and qualification filters. Increase this when filtering to a specific seller country.",
+      "editor": "number",
+      "default": 100,
+      "minimum": 1,
+      "maximum": 500
     },
     "minItemsSold": {
       "title": "Minimum public items sold",
@@ -149,6 +158,13 @@
       "default": 60,
       "minimum": 15,
       "maximum": 180
+    },
+    "autoMarketProxy": {
+      "title": "Use a proxy matched to the selected market",
+      "type": "boolean",
+      "description": "Uses the standard Apify Proxy with the selected market's country for the browser session. Turn off only when custom proxy URLs already provide the correct market location.",
+      "editor": "checkbox",
+      "default": true
     },
     "dedupeMode": {
       "title": "Cross-run deduplication mode",
@@ -232,7 +248,7 @@
     "proxyConfiguration": {
       "title": "Proxy configuration",
       "type": "object",
-      "description": "Standard Apify proxy settings. Residential proxy is optional and adds cost.",
+      "description": "Optional custom Apify proxy settings. When automatic market proxy is enabled, the selected market country is used unless overridden here. Residential proxy can add cost.",
       "editor": "proxy",
       "default": { "useApifyProxy": false },
       "prefill": { "useApifyProxy": false }

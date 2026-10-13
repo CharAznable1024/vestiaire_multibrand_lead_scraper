@@ -81,6 +81,18 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         throw new Error('dedupeMode must be all, new_only, or new_and_updated');
     }
 
+    const maxSellers = integer(input.maxSellers, 25, 1, 200, 'maxSellers');
+    const maxSellerDetailCandidates = integer(
+        input.maxSellerDetailCandidates,
+        Math.min(500, Math.max(50, maxSellers * 4)),
+        1,
+        500,
+        'maxSellerDetailCandidates',
+    );
+    if (maxSellerDetailCandidates < maxSellers) {
+        throw new Error('maxSellerDetailCandidates must be at least maxSellers');
+    }
+
     return {
         searchQueries,
         startUrls: urls,
@@ -88,7 +100,8 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         sellerCountries,
         maxListingsPerQuery: integer(input.maxListingsPerQuery, 48, 1, 500, 'maxListingsPerQuery'),
         maxPagesPerQuery: integer(input.maxPagesPerQuery, 1, 1, 10, 'maxPagesPerQuery'),
-        maxSellers: integer(input.maxSellers, 25, 1, 200, 'maxSellers'),
+        maxSellers,
+        maxSellerDetailCandidates,
         minItemsSold: integer(input.minItemsSold, 5, 0, 1_000_000, 'minItemsSold'),
         minItemsListed: integer(input.minItemsListed, 1, 0, 1_000_000, 'minItemsListed'),
         allowedSellerSegments,
@@ -105,6 +118,7 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         maxRequestRetries: integer(input.maxRequestRetries, 2, 0, 5, 'maxRequestRetries'),
         navigationTimeoutSecs: integer(input.navigationTimeoutSecs, 60, 15, 180, 'navigationTimeoutSecs'),
         proxyConfiguration: proxy(input.proxyConfiguration),
+        autoMarketProxy: boolean(input.autoMarketProxy, true, 'autoMarketProxy'),
         dedupeMode,
         dedupeStoreName: text(
             input.dedupeStoreName,

@@ -8,6 +8,8 @@ describe('normalizeInput', () => {
         expect(input.searchQueries).toEqual(['Gucci', 'handbags']);
         expect(input.maxListingsPerQuery).toBe(48);
         expect(input.maxSellers).toBe(25);
+        expect(input.maxSellerDetailCandidates).toBe(100);
+        expect(input.autoMarketProxy).toBe(true);
         expect(input.minItemsSold).toBe(5);
         expect(input.dedupeStoreName).toBe('vestiaire-merchant-lead-state-v2');
     });
@@ -29,5 +31,6 @@ describe('normalizeInput', () => {
         expect(() => normalizeInput({ allowedSellerSegments: ['INVALID'] })).toThrow(/allowedSellerSegments/);
         expect(() => normalizeInput({ dedupeStoreName: '../bad' })).toThrow(/dedupeStoreName/);
         expect(() => normalizeInput({ sellerCountries: ['United States'] })).toThrow(/sellerCountries/);
+        expect(() => normalizeInput({ maxSellers: 10, maxSellerDetailCandidates: 9 })).toThrow(/maxSellerDetailCandidates/);
     });
 });

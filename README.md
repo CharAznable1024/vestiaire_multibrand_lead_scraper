@@ -19,12 +19,12 @@ No login is used. The Actor processes public listing and product-detail data. It
 
 ## How it works
 
-1. Run the selected market's unfiltered public catalog by default, or use optional `searchQueries` and filtered `startUrls`.
+1. Route the browser session through a proxy matched to the selected market by default, then run that market's unfiltered public catalog or optional `searchQueries` / filtered `startUrls`.
 2. Normalize and deduplicate listing cards by item ID.
 3. Group listing evidence by Seller ID.
-4. Select at most `maxSellers` candidates, prioritizing sellers with more sampled listings.
-5. Open one representative product detail per seller and parse public seller statistics from `__NEXT_DATA__`.
-6. Filter sellers by sold/listed thresholds and allowed public segments.
+4. Select up to `maxSellerDetailCandidates` candidates, prioritizing sellers with more sampled listings.
+5. Open one representative product detail per candidate and parse public seller statistics from `__NEXT_DATA__`.
+6. Filter by the seller detail's actual public country code, sold/listed thresholds, and allowed public segments; then cap Dataset rows at `maxSellers`.
 7. Optionally discover and verify public business contacts.
 8. Apply persistent cross-run deduplication and write one Dataset row per emitted merchant.
 
@@ -38,19 +38,21 @@ No login is used. The Actor processes public listing and product-detail data. It
 | `sellerCountries` | empty | Optional seller-country ISO filters. Empty means all public seller countries. |
 | `maxListingsPerQuery` | 48 | Listing cards sampled per source. |
 | `maxPagesPerQuery` | 1 | Pagination cap per source. |
-| `maxSellers` | 25 | Maximum representative seller-detail pages. This is the main detail-cost cap. |
+| `maxSellers` | 25 | Maximum qualified merchant leads emitted to the Dataset. |
+| `maxSellerDetailCandidates` | 100 | Maximum representative seller-detail pages inspected before seller-country and qualification filters. This is the main detail-cost cap. |
 | `minItemsSold` | 5 | Minimum public `products_sold`. |
 | `minItemsListed` | 1 | Minimum public `products_listed`. |
 | `allowedSellerSegments` | B2C, C2C, UNKNOWN | Allowed public seller segments. |
 | `requireSellerDetails` | true | Exclude sellers whose public statistics cannot be parsed. |
 | `refreshProfileStats` | true | Override potentially stale product-detail sold/listed counts with the current numeric Profile header when available. |
+| `autoMarketProxy` | true | Use the selected market's country for the standard Apify Proxy session; custom proxy URLs take precedence. |
 | `dedupeMode` | new_and_updated | Emit all, only new, or new and changed sellers. |
 | `contactEnrichment` | true | Discover and verify public business websites and contacts. |
 | `maxContactEnrichmentLeads` | 10 | Maximum paid website searches per uncached run. |
 
 See [`input.example.json`](./input.example.json) for a complete bounded input.
 
-When both `searchQueries` and `startUrls` are empty, the Actor automatically discovers sellers from `https://<market-domain>/search/`. Market selection and seller-location filtering are separate: `country: "US"` chooses the US marketplace, while `sellerCountries: ["FR", "IT"]` keeps sellers publicly located in France or Italy. Vestiaire's public seller detail currently provides country and ISO country code, not a dependable state/province/city field.
+When both `searchQueries` and `startUrls` are empty, the Actor automatically discovers sellers from `https://<market-domain>/search/`. Market selection and seller-location filtering are separate: `country: "GB"` configures the UK marketplace session, while `sellerCountries: ["GB"]` keeps sellers publicly located in the United Kingdom. The Actor does **not** treat a listing card's country as seller location; it only applies `sellerCountries` after public Seller Detail enrichment. Vestiaire's public seller detail currently provides country and ISO country code, not a dependable state/province/city field.
 
 ## Output schema v2
 
@@ -106,12 +108,12 @@ This downstream Actor adds a per-search-page cost. Contact evidence is cached fo
 The main cost drivers are:
 
 - one browser search/category page per discovery source and page
-- one representative product detail per candidate seller, capped by `maxSellers`
-- optional residential proxy transfer
+- one representative product detail per candidate seller, capped by `maxSellerDetailCandidates`
+- the automatic market-matched Apify Proxy session; optional residential proxy transfer can add additional cost
 - one downstream Google search page per uncached contact candidate, capped by `maxContactEnrichmentLeads`
 - Dataset and named KV operations
 
-Start with `maxSellers: 10-25` and contact enrichment capped at 3-5 leads.
+Start with `maxSellers: 10-25`, `maxSellerDetailCandidates: 50-100`, and contact enrichment capped at 3-5 leads. Country-filtered campaigns may need a higher candidate cap because seller location is only known after detail enrichment.
 
 If Vestiaire rejects search-API pagination, the Actor keeps the successfully captured first page and logs a warning. For broader discovery without brand filters, provide several category `startUrls`; each category creates an independent browser-backed first-page sample.
 

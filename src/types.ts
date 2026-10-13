@@ -19,6 +19,7 @@ export interface ActorInput {
     maxListingsPerQuery?: unknown;
     maxPagesPerQuery?: unknown;
     maxSellers?: unknown;
+    maxSellerDetailCandidates?: unknown;
     minItemsSold?: unknown;
     minItemsListed?: unknown;
     allowedSellerSegments?: unknown;
@@ -29,6 +30,7 @@ export interface ActorInput {
     maxRequestRetries?: unknown;
     navigationTimeoutSecs?: unknown;
     proxyConfiguration?: unknown;
+    autoMarketProxy?: unknown;
     dedupeMode?: unknown;
     dedupeStoreName?: unknown;
     reemitAfterDays?: unknown;
@@ -48,6 +50,7 @@ export interface NormalizedInput {
     maxListingsPerQuery: number;
     maxPagesPerQuery: number;
     maxSellers: number;
+    maxSellerDetailCandidates: number;
     minItemsSold: number;
     minItemsListed: number;
     allowedSellerSegments: SellerSegment[];
@@ -58,6 +61,7 @@ export interface NormalizedInput {
     maxRequestRetries: number;
     navigationTimeoutSecs: number;
     proxyConfiguration: ProxyInput;
+    autoMarketProxy: boolean;
     dedupeMode: DedupeMode;
     dedupeStoreName: string;
     reemitAfterDays: number;

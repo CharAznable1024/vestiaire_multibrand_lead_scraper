@@ -9,8 +9,25 @@ const HOSTS: Record<Market, string> = {
     ES: 'es.vestiairecollective.com',
 };
 
+/**
+ * Market-specific values are deliberately configuration, not separate crawler
+ * implementations. Keep all discovery and seller-detail logic market-agnostic.
+ */
+const PROXY_COUNTRIES: Record<Market, string> = {
+    US: 'US',
+    GB: 'GB',
+    FR: 'FR',
+    DE: 'DE',
+    IT: 'IT',
+    ES: 'ES',
+};
+
 export function marketHost(market: Market): string {
     return HOSTS[market];
+}
+
+export function marketProxyCountry(market: Market): string {
+    return PROXY_COUNTRIES[market];
 }
 
 export function searchUrl(brand: string, market: Market): string {
