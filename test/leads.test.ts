@@ -32,7 +32,7 @@ describe('merchant lead aggregation', () => {
             categories: ['Handbags', 'Jackets'],
             sample_listing_count: 2,
         });
-        expect(leads[0].profile_url).toContain('/profile/sampleluxurystore/');
+        expect(leads[0].profile_url).toContain('/profile/seller-1/');
         expect(leads[0].qualification_reasons.join(' ')).toContain('34 public items sold');
     });
 

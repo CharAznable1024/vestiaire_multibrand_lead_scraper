@@ -1,4 +1,4 @@
-import { sellerProfileUrlByUsername } from './market.js';
+import { sellerProfileUrl } from './market.js';
 import type {
     LeadRecord,
     Market,
@@ -140,7 +140,7 @@ export function buildMerchantLeads(
                 seller_id: aggregate.seller_id,
                 seller_name: sellerName,
                 seller_username: detail?.seller_username ?? null,
-                profile_url: sellerProfileUrlByUsername(detail?.seller_username ?? null, aggregate.seller_id, market),
+                profile_url: sellerProfileUrl(aggregate.seller_id, market),
                 seller_segment: detail?.seller_segment ?? 'UNKNOWN',
                 seller_country: detail?.seller_country ?? aggregate.countries[0] ?? null,
                 seller_country_code: detail?.seller_country_code ?? null,

@@ -31,7 +31,3 @@ export function imageUrl(path: string): string {
 export function sellerProfileUrl(sellerId: string, market: Market): string {
     return `https://${marketHost(market)}/profile/${encodeURIComponent(sellerId)}/`;
 }
-
-export function sellerProfileUrlByUsername(username: string | null, sellerId: string, market: Market): string {
-    return `https://${marketHost(market)}/profile/${encodeURIComponent(username || sellerId)}/`;
-}
