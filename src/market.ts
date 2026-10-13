@@ -2,7 +2,7 @@ import type { Market } from './types.js';
 
 const HOSTS: Record<Market, string> = {
     US: 'us.vestiairecollective.com',
-    GB: 'www.vestiairecollective.com',
+    GB: 'uk.vestiairecollective.com',
     FR: 'fr.vestiairecollective.com',
     DE: 'de.vestiairecollective.com',
     IT: 'it.vestiairecollective.com',

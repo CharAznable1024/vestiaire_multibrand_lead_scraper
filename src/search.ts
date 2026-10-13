@@ -41,7 +41,11 @@ export async function captureSearchResponse(page: Page, timeoutMillis: number): 
 function forwardedHeaders(headers: Record<string, string>): Record<string, string> {
     return Object.fromEntries(
         Object.entries(headers).filter(
-            ([name]) => !FORBIDDEN_FORWARD_HEADERS.has(name.toLowerCase()) && !name.toLowerCase().startsWith('sec-'),
+            ([name, value]) =>
+                /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) &&
+                !FORBIDDEN_FORWARD_HEADERS.has(name.toLowerCase()) &&
+                !name.toLowerCase().startsWith('sec-') &&
+                !/[\r\n]/.test(value),
         ),
     );
 }
