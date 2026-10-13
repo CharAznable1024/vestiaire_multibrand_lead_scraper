@@ -35,7 +35,7 @@
     "sellerCountries": {
       "title": "Seller countries",
       "type": "array",
-      "description": "Optional ISO country-code filter applied to the seller's public country after detail enrichment. Leave empty for all seller countries.",
+      "description": "Optional ISO country-code filter applied through Vestiaire's public Shipped From listing filter and verified again from seller detail. Leave empty for all seller countries.",
       "editor": "stringList",
       "default": [],
       "prefill": [],

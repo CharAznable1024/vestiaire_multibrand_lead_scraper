@@ -9,6 +9,7 @@ import { marketCatalogUrl, marketProxyCountry, searchUrl, sellerProfileUrl } fro
 import { normalizeProduct } from './normalize.js';
 import { captureSearchResponse, fetchSearchPageWithRetries } from './search.js';
 import { parseProfileStatsText, parseSellerDetailNextData } from './seller-detail.js';
+import { applyShippedFromFilter } from './shipped-from-filter.js';
 import type { ActorInput, CapturedSearchResponse, ProductRecord, RawSearchResponse, RunSummary, SellerDetail } from './types.js';
 
 await Actor.init();
@@ -109,8 +110,21 @@ const searchCrawler = new PlaywrightCrawler({
         const source = String(request.userData.source);
         log.info('Processing listing source', { source, url: request.loadedUrl });
         const key = responseKey(request);
-        const captured = await capturedResponses.get(key);
-        if (!captured) throw new Error(`Missing search response listener for ${source}`);
+        const initialSearch = await capturedResponses.get(key);
+        if (!initialSearch) throw new Error(`Missing search response listener for ${source}`);
+        let captured = initialSearch;
+        if (input.sellerCountries.length > 0) {
+            try {
+                captured = await applyShippedFromFilter(page, input.sellerCountries, Math.min(input.navigationTimeoutSecs * 1_000, 15_000));
+                log.info('Applied public Shipped From filter', { source, sellerCountries: input.sellerCountries });
+            } catch (error) {
+                log.warning('Could not apply public Shipped From filter; retaining detail-level country verification', {
+                    source,
+                    sellerCountries: input.sellerCountries,
+                    error: String(error),
+                });
+            }
+        }
 
         const pages: RawSearchResponse[] = [captured.data];
         const totalPages = Math.max(1, Math.trunc(captured.data.paginationStats?.totalPages ?? 1));
