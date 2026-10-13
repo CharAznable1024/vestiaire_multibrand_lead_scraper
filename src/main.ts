@@ -146,7 +146,19 @@ if (failedSources.length === listingSources.length) {
     throw new Error('All listing sources failed. Review OUTPUT and run logs.');
 }
 
-const aggregates = aggregateSellers([...productsById.values()]).slice(0, input.maxSellers);
+const allAggregates = aggregateSellers([...productsById.values()]);
+const countryPrefilteredAggregates =
+    input.sellerCountries.length > 0
+        ? allAggregates.filter((aggregate) =>
+              aggregate.countries.some((country) => input.sellerCountries.includes(country.toUpperCase())),
+          )
+        : allAggregates;
+log.info('Seller candidates prepared', {
+    discovered: allAggregates.length,
+    afterCountryPrefilter: countryPrefilteredAggregates.length,
+    sellerCountries: input.sellerCountries,
+});
+const aggregates = countryPrefilteredAggregates.slice(0, input.maxSellers);
 sellerDetailAttempted = aggregates.length;
 const detailCrawler = new PlaywrightCrawler({
     proxyConfiguration,

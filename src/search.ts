@@ -63,20 +63,13 @@ export async function fetchSearchPage(
     pagination.offset = offset;
     payload.pagination = pagination;
 
-    const result = await page.evaluate(
-        async ({ endpoint, headers, body }) => {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers,
-                credentials: 'include',
-                body: JSON.stringify(body),
-            });
-            const text = await response.text();
-            if (!response.ok) throw new Error(`Search API returned HTTP ${response.status}: ${text.slice(0, 200)}`);
-            return JSON.parse(text) as RawSearchResponse;
-        },
-        { endpoint: captured.endpoint, headers: forwardedHeaders(captured.headers), body: payload },
-    );
-
-    return result;
+    const response = await page.request.post(captured.endpoint, {
+        headers: forwardedHeaders(captured.headers),
+        data: payload,
+        failOnStatusCode: false,
+        timeout: 60_000,
+    });
+    const text = await response.text();
+    if (!response.ok()) throw new Error(`Search API returned HTTP ${response.status()}: ${text.slice(0, 200)}`);
+    return JSON.parse(text) as RawSearchResponse;
 }
