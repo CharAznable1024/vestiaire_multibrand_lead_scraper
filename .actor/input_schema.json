@@ -10,8 +10,8 @@
       "type": "array",
       "description": "Brands, categories, or product phrases used to discover sellers.",
       "editor": "stringList",
-      "default": ["Gucci", "Chanel", "Louis Vuitton"],
-      "prefill": ["Gucci", "Chanel", "Louis Vuitton"],
+      "default": [],
+      "prefill": [],
       "maxItems": 20,
       "items": { "type": "string", "minLength": 1 }
     },
@@ -31,6 +31,15 @@
       "default": "US",
       "enum": ["US", "GB", "FR", "DE", "IT", "ES"],
       "enumTitles": ["United States", "United Kingdom", "France", "Germany", "Italy", "Spain"]
+    },
+    "sellerCountries": {
+      "title": "Seller countries",
+      "type": "array",
+      "description": "Optional ISO country-code filter applied to the seller's public country after detail enrichment. Leave empty for all seller countries.",
+      "editor": "stringList",
+      "default": [],
+      "prefill": [],
+      "items": { "type": "string", "pattern": "^[A-Za-z]{2}$" }
     },
     "maxListingsPerQuery": {
       "title": "Maximum listings per source",

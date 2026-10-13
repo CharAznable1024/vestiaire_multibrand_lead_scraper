@@ -5,7 +5,7 @@ import { enrichContacts } from './contact-enrichment.js';
 import { applyCrossRunDedupe, normalizePersistentState } from './dedupe.js';
 import { normalizeInput } from './input.js';
 import { aggregateSellers, buildMerchantLeads, countSellers } from './leads.js';
-import { searchUrl, sellerProfileUrl } from './market.js';
+import { marketCatalogUrl, searchUrl, sellerProfileUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
 import { captureSearchResponse, fetchSearchPage } from './search.js';
 import { parseProfileStatsText, parseSellerDetailNextData } from './seller-detail.js';
@@ -15,6 +15,10 @@ await Actor.init();
 
 const input = normalizeInput(await Actor.getInput<ActorInput>());
 const startedAt = new Date().toISOString();
+const effectiveStartUrls =
+    input.searchQueries.length === 0 && input.startUrls.length === 0
+        ? [marketCatalogUrl(input.country)]
+        : input.startUrls;
 const productsById = new Map<string, ProductRecord>();
 const sellerDetails = new Map<string, SellerDetail>();
 const failedSources: Array<{ source: string; error: string }> = [];
@@ -36,7 +40,7 @@ const summary = (status: RunSummary['status']): RunSummary => ({
     status,
     schema_version: '2.0',
     search_queries: input.searchQueries,
-    start_urls: input.startUrls,
+    start_urls: effectiveStartUrls,
     failed_sources: failedSources,
     listing_count: productsById.size,
     seller_count: countSellers([...productsById.values()]),
@@ -129,7 +133,7 @@ const listingSources = [
         uniqueKey: `query:${input.country}:${query.toLowerCase()}`,
         userData: { source: query },
     })),
-    ...input.startUrls.map((url) => ({
+    ...effectiveStartUrls.map((url) => ({
         url,
         uniqueKey: `url:${url}`,
         userData: { source: url },

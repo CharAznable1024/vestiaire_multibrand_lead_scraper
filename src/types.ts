@@ -15,6 +15,7 @@ export interface ActorInput {
     searchQueries?: unknown;
     startUrls?: unknown;
     country?: unknown;
+    sellerCountries?: unknown;
     maxListingsPerQuery?: unknown;
     maxPagesPerQuery?: unknown;
     maxSellers?: unknown;
@@ -43,6 +44,7 @@ export interface NormalizedInput {
     searchQueries: string[];
     startUrls: string[];
     country: Market;
+    sellerCountries: string[];
     maxListingsPerQuery: number;
     maxPagesPerQuery: number;
     maxSellers: number;

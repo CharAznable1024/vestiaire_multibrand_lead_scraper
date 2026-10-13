@@ -1,7 +1,8 @@
 {
-  "searchQueries": ["Gucci", "Chanel", "Louis Vuitton"],
+  "searchQueries": [],
   "startUrls": [],
   "country": "US",
+  "sellerCountries": [],
   "maxListingsPerQuery": 48,
   "maxPagesPerQuery": 1,
   "maxSellers": 25,

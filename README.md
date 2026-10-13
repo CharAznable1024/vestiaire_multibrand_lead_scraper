@@ -19,7 +19,7 @@ No login is used. The Actor processes public listing and product-detail data. It
 
 ## How it works
 
-1. Run public Vestiaire searches from `searchQueries` and/or filtered `startUrls`.
+1. Run the selected market's unfiltered public catalog by default, or use optional `searchQueries` and filtered `startUrls`.
 2. Normalize and deduplicate listing cards by item ID.
 3. Group listing evidence by Seller ID.
 4. Select at most `maxSellers` candidates, prioritizing sellers with more sampled listings.
@@ -32,8 +32,10 @@ No login is used. The Actor processes public listing and product-detail data. It
 
 | Field | Default | Description |
 | --- | ---: | --- |
-| `searchQueries` | Gucci, Chanel, Louis Vuitton | Brand, category, or product phrases used to discover sellers. |
+| `searchQueries` | empty | Optional brand, category, or product phrases. Empty input does not apply a brand filter. |
 | `startUrls` | empty | Optional filtered Vestiaire search/category/brand URLs. |
+| `country` | US | Vestiaire market domain, localized price environment, and default proxy geography. |
+| `sellerCountries` | empty | Optional seller-country ISO filters. Empty means all public seller countries. |
 | `maxListingsPerQuery` | 48 | Listing cards sampled per source. |
 | `maxPagesPerQuery` | 1 | Pagination cap per source. |
 | `maxSellers` | 25 | Maximum representative seller-detail pages. This is the main detail-cost cap. |
@@ -47,6 +49,8 @@ No login is used. The Actor processes public listing and product-detail data. It
 | `maxContactEnrichmentLeads` | 10 | Maximum paid website searches per uncached run. |
 
 See [`input.example.json`](./input.example.json) for a complete bounded input.
+
+When both `searchQueries` and `startUrls` are empty, the Actor automatically discovers sellers from `https://<market-domain>/search/`. Market selection and seller-location filtering are separate: `country: "US"` chooses the US marketplace, while `sellerCountries: ["FR", "IT"]` keeps sellers publicly located in France or Italy. Vestiaire's public seller detail currently provides country and ISO country code, not a dependable state/province/city field.
 
 ## Output schema v2
 

@@ -12,6 +12,13 @@ describe('normalizeInput', () => {
         expect(input.dedupeStoreName).toBe('vestiaire-merchant-lead-state-v2');
     });
 
+    it('defaults to unfiltered market discovery and supports seller-country filters', () => {
+        const input = normalizeInput({ sellerCountries: ['us', 'FR'] });
+        expect(input.searchQueries).toEqual([]);
+        expect(input.startUrls).toEqual([]);
+        expect(input.sellerCountries).toEqual(['US', 'FR']);
+    });
+
     it('accepts filtered Vestiaire URLs and validates the host', () => {
         const input = normalizeInput({ searchQueries: [], startUrls: [{ url: 'https://us.vestiairecollective.com/women-bags/' }] });
         expect(input.startUrls).toEqual(['https://us.vestiairecollective.com/women-bags/']);
@@ -21,5 +28,6 @@ describe('normalizeInput', () => {
     it('validates seller segments and persistent store names', () => {
         expect(() => normalizeInput({ allowedSellerSegments: ['INVALID'] })).toThrow(/allowedSellerSegments/);
         expect(() => normalizeInput({ dedupeStoreName: '../bad' })).toThrow(/dedupeStoreName/);
+        expect(() => normalizeInput({ sellerCountries: ['United States'] })).toThrow(/sellerCountries/);
     });
 });

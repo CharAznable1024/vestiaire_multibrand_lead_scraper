@@ -17,6 +17,10 @@ export function searchUrl(brand: string, market: Market): string {
     return `https://${marketHost(market)}/search/?q=${encodeURIComponent(brand)}`;
 }
 
+export function marketCatalogUrl(market: Market): string {
+    return `https://${marketHost(market)}/search/`;
+}
+
 export function absoluteProductUrl(path: string, market: Market): string {
     if (/^https?:\/\//i.test(path)) return path;
     return `https://${marketHost(market)}${path.startsWith('/') ? path : `/${path}`}`;

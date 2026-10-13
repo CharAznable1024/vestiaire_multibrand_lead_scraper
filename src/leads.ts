@@ -119,6 +119,10 @@ export function buildMerchantLeads(
             if (input.requireSellerDetails && detail?.items_sold === null) return false;
             if ((detail?.items_sold ?? -1) < input.minItemsSold) return false;
             if ((detail?.items_listed ?? -1) < input.minItemsListed) return false;
+            if (
+                input.sellerCountries.length > 0 &&
+                (!detail?.seller_country_code || !input.sellerCountries.includes(detail.seller_country_code.toUpperCase()))
+            ) return false;
             const segment = detail?.seller_segment ?? 'UNKNOWN';
             return input.allowedSellerSegments.includes(segment);
         })

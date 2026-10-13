@@ -56,12 +56,15 @@ function proxy(value: unknown): ProxyInput {
 
 export function normalizeInput(raw: ActorInput | null | undefined): NormalizedInput {
     const input = raw ?? {};
-    const searchQueries = stringList(input.searchQueries, ['Gucci', 'Chanel', 'Louis Vuitton'], 'searchQueries', 20);
+    const searchQueries = stringList(input.searchQueries, [], 'searchQueries', 20);
     const urls = startUrls(input.startUrls);
-    if (!searchQueries.length && !urls.length) throw new Error('Provide at least one search query or start URL');
 
     const country = (input.country ?? 'US') as Market;
     if (!MARKETS.has(country)) throw new Error(`Unsupported country: ${String(input.country)}`);
+    const sellerCountries = stringList(input.sellerCountries, [], 'sellerCountries', 50).map((value) => value.toUpperCase());
+    if (sellerCountries.some((value) => !/^[A-Z]{2}$/.test(value))) {
+        throw new Error('sellerCountries must contain ISO 3166-1 alpha-2 country codes');
+    }
 
     const allowedSellerSegments = stringList(
         input.allowedSellerSegments,
@@ -82,6 +85,7 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         searchQueries,
         startUrls: urls,
         country,
+        sellerCountries,
         maxListingsPerQuery: integer(input.maxListingsPerQuery, 48, 1, 500, 'maxListingsPerQuery'),
         maxPagesPerQuery: integer(input.maxPagesPerQuery, 1, 1, 10, 'maxPagesPerQuery'),
         maxSellers: integer(input.maxSellers, 25, 1, 200, 'maxSellers'),
