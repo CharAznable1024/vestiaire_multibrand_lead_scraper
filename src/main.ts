@@ -5,11 +5,10 @@ import { enrichContacts } from './contact-enrichment.js';
 import { applyCrossRunDedupe, normalizePersistentState } from './dedupe.js';
 import { normalizeInput } from './input.js';
 import { aggregateSellers, buildMerchantLeads, countSellers } from './leads.js';
-import { marketCatalogUrl, marketProxyCountry, searchUrl, sellerProfileUrl } from './market.js';
+import { globalSearchUrl, marketCatalogUrl, marketProxyCountry, searchUrl, sellerProfileUrl, shippedFromSearchUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
 import { captureSearchResponse, fetchSearchPageWithRetries } from './search.js';
 import { parseProfileStatsText, parseSellerDetailNextData } from './seller-detail.js';
-import { applyShippedFromFilter } from './shipped-from-filter.js';
 import type { ActorInput, CapturedSearchResponse, ProductRecord, RawSearchResponse, RunSummary, SellerDetail } from './types.js';
 
 await Actor.init();
@@ -18,7 +17,7 @@ const input = normalizeInput(await Actor.getInput<ActorInput>());
 const startedAt = new Date().toISOString();
 const effectiveStartUrls =
     input.searchQueries.length === 0 && input.startUrls.length === 0
-        ? [marketCatalogUrl(input.country)]
+        ? [input.sellerCountries.length ? globalSearchUrl() : marketCatalogUrl(input.country)]
         : input.startUrls;
 const productsById = new Map<string, ProductRecord>();
 const sellerDetails = new Map<string, SellerDetail>();
@@ -112,19 +111,7 @@ const searchCrawler = new PlaywrightCrawler({
         const key = responseKey(request);
         const initialSearch = await capturedResponses.get(key);
         if (!initialSearch) throw new Error(`Missing search response listener for ${source}`);
-        let captured = initialSearch;
-        if (input.sellerCountries.length > 0) {
-            try {
-                captured = await applyShippedFromFilter(page, input.sellerCountries, Math.min(input.navigationTimeoutSecs * 1_000, 15_000));
-                log.info('Applied public Shipped From filter', { source, sellerCountries: input.sellerCountries });
-            } catch (error) {
-                log.warning('Could not apply public Shipped From filter; retaining detail-level country verification', {
-                    source,
-                    sellerCountries: input.sellerCountries,
-                    error: String(error),
-                });
-            }
-        }
+        const captured = initialSearch;
 
         const pages: RawSearchResponse[] = [captured.data];
         const totalPages = Math.max(1, Math.trunc(captured.data.paginationStats?.totalPages ?? 1));
@@ -165,9 +152,9 @@ const searchCrawler = new PlaywrightCrawler({
     },
 });
 
-const listingSources = [
+const unfilteredListingSources = [
     ...input.searchQueries.map((query) => ({
-        url: searchUrl(query, input.country),
+        url: input.sellerCountries.length ? globalSearchUrl(query) : searchUrl(query, input.country),
         uniqueKey: `query:${input.country}:${query.toLowerCase()}`,
         userData: { source: query },
     })),
@@ -177,6 +164,15 @@ const listingSources = [
         userData: { source: url },
     })),
 ];
+const listingSources = input.sellerCountries.length
+    ? unfilteredListingSources.flatMap((source) =>
+          input.sellerCountries.map((countryCode) => ({
+              url: shippedFromSearchUrl(source.url, countryCode),
+              uniqueKey: `${source.uniqueKey}:shipped-from:${countryCode}`,
+              userData: { source: `${String(source.userData.source)} [shipped from ${countryCode}]` },
+          })),
+      )
+    : unfilteredListingSources;
 await searchCrawler.run(listingSources);
 
 if (failedSources.length === listingSources.length) {
@@ -189,7 +185,7 @@ log.info('Seller candidates prepared', {
     discovered: allAggregates.length,
     candidateLimit: input.maxSellerDetailCandidates,
     sellerCountries: input.sellerCountries,
-    countryFilterStage: 'seller_detail',
+    countryFilterStage: input.sellerCountries.length ? 'public_shipped_from_then_seller_detail' : 'seller_detail',
 });
 // Listing-card country is a market/listing field and is not a reliable seller
 // location. Always enrich first, then filter on Seller Detail's country code.

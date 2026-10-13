@@ -8,6 +8,7 @@ const HOSTS: Record<Market, string> = {
     IT: 'it.vestiairecollective.com',
     ES: 'es.vestiairecollective.com',
 };
+const GLOBAL_HOST = 'www.vestiairecollective.com';
 
 /**
  * Market-specific values are deliberately configuration, not separate crawler
@@ -36,6 +37,22 @@ export function searchUrl(brand: string, market: Market): string {
 
 export function marketCatalogUrl(market: Market): string {
     return `https://${marketHost(market)}/search/`;
+}
+
+export function globalSearchUrl(query = ''): string {
+    return `https://${GLOBAL_HOST}/search/${query ? `?q=${encodeURIComponent(query)}` : ''}`;
+}
+
+/**
+ * Vestiaire exposes the public Shipped From selection in its client-side
+ * route, for example https://www.vestiairecollective.com/search/#country=GB.
+ */
+export function shippedFromSearchUrl(url: string, countryCode: string): string {
+    const parsed = new URL(url);
+    const hash = new URLSearchParams(parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash);
+    hash.set('country', countryCode.toUpperCase());
+    parsed.hash = hash.toString();
+    return parsed.toString();
 }
 
 export function absoluteProductUrl(path: string, market: Market): string {

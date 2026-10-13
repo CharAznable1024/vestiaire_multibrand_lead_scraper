@@ -19,7 +19,7 @@ No login is used. The Actor processes public listing and product-detail data. It
 
 ## How it works
 
-1. Run the selected market's public catalog or optional `searchQueries` / filtered `startUrls`. When seller countries are specified, apply Vestiaire's public **Shipped From** filter before collecting listing cards.
+1. Run the selected market's public catalog or optional `searchQueries` / filtered `startUrls`. When seller countries are specified, use Vestiaire's public **Shipped From** URL state (for example, `https://www.vestiairecollective.com/search/#country=GB`) before collecting listing cards.
 2. Normalize and deduplicate listing cards by item ID.
 3. Group listing evidence by Seller ID.
 4. Select up to `maxSellerDetailCandidates` candidates, prioritizing sellers with more sampled listings.
@@ -35,7 +35,7 @@ No login is used. The Actor processes public listing and product-detail data. It
 | `searchQueries` | empty | Optional brand, category, or product phrases. Empty input does not apply a brand filter. |
 | `startUrls` | empty | Optional filtered Vestiaire search/category/brand URLs. |
 | `country` | US | Vestiaire market domain, localized price environment, and default proxy geography. |
-| `sellerCountries` | empty | Optional seller-country ISO filters. They drive the public **Shipped From** filter and are verified from Seller Detail. Empty means all public seller countries. |
+| `sellerCountries` | empty | Optional seller-country ISO filters. Each becomes a public **Shipped From** URL source such as `#country=GB`, then is verified from Seller Detail. Empty means all public seller countries. |
 | `maxListingsPerQuery` | 48 | Listing cards sampled per source. |
 | `maxPagesPerQuery` | 1 | Pagination cap per source. |
 | `maxSellers` | 25 | Maximum qualified merchant leads emitted to the Dataset. |
