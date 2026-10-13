@@ -39,10 +39,25 @@ export async function applyShippedFromFilter(
     }
 
     const responsePromise = captureSearchResponse(page, timeoutMillis);
+    // The panel can require a separate submit action. Mark the promise handled
+    // immediately so a timeout while inspecting that action cannot terminate
+    // the Actor before this function returns a controlled error.
+    void responsePromise.catch(() => undefined);
     for (const option of options) await option.click();
 
-    const applyButton = page.getByRole('button', { name: /^apply$/i }).last();
-    if ((await applyButton.count()) > 0 && (await applyButton.isVisible())) await applyButton.click();
+    const applyButton = page.getByRole('button', { name: /^(apply|show .*items?)$/i }).last();
+    if ((await applyButton.count()) > 0 && (await applyButton.isVisible())) {
+        await applyButton.click({ force: true });
+    } else {
+        // Some responsive versions commit when the hot-filter is closed.
+        await filterButton.click({ force: true });
+    }
 
-    return responsePromise;
+    try {
+        return await responsePromise;
+    } catch (error) {
+        const content = page.locator('#hot-filter-content-CATALOG\\.FILTERS\\.LOCATION');
+        const visibleText = (await content.count()) ? (await content.innerText()).replace(/\s+/g, ' ').slice(0, 1_000) : '';
+        throw new Error(`Shipped From selection did not trigger a search response: ${String(error)}; panel=${visibleText}`);
+    }
 }
