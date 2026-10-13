@@ -163,6 +163,8 @@ export function buildMerchantLeads(
                 sample_product_urls: [...new Set(aggregate.products.map((product) => product.item_url))].slice(0, 5),
                 seller_detail_source_url: detail?.detail_source_url ?? null,
                 seller_detail_status: detail ? ('enriched' as const) : ('unavailable' as const),
+                seller_stats_source: detail ? detail.seller_stats_source : ('unavailable' as const),
+                seller_stats_observed_at: detail?.seller_stats_observed_at ?? scrapedAt,
                 lead_score: score,
                 qualification,
                 qualification_reasons: reasons,

@@ -5,10 +5,10 @@ import { enrichContacts } from './contact-enrichment.js';
 import { applyCrossRunDedupe, normalizePersistentState } from './dedupe.js';
 import { normalizeInput } from './input.js';
 import { aggregateSellers, buildMerchantLeads, countSellers } from './leads.js';
-import { searchUrl } from './market.js';
+import { searchUrl, sellerProfileUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
 import { captureSearchResponse, fetchSearchPage } from './search.js';
-import { parseSellerDetailNextData } from './seller-detail.js';
+import { parseProfileStatsText, parseSellerDetailNextData } from './seller-detail.js';
 import type { ActorInput, CapturedSearchResponse, ProductRecord, RawSearchResponse, RunSummary, SellerDetail } from './types.js';
 
 await Actor.init();
@@ -75,7 +75,7 @@ const searchCrawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxConcurrency: input.maxConcurrency,
     maxRequestRetries: input.maxRequestRetries,
-    requestHandlerTimeoutSecs: input.navigationTimeoutSecs + 30,
+    requestHandlerTimeoutSecs: input.navigationTimeoutSecs * 2 + 45,
     navigationTimeoutSecs: input.navigationTimeoutSecs,
     useSessionPool: true,
     persistCookiesPerSession: true,
@@ -160,8 +160,41 @@ const detailCrawler = new PlaywrightCrawler({
         const detail = parseSellerDetailNextData(json, request.loadedUrl ?? request.url);
         if (!detail) throw new Error('Could not parse public seller statistics from product detail');
         if (detail.seller_id !== sellerId) throw new Error(`Seller ID mismatch: expected ${sellerId}, got ${detail.seller_id}`);
+
+        if (input.refreshProfileStats) {
+            const profileUrl = sellerProfileUrl(sellerId, input.country);
+            try {
+                const response = await page.goto(profileUrl, {
+                    waitUntil: 'domcontentloaded',
+                    timeout: input.navigationTimeoutSecs * 1_000,
+                });
+                if (response && response.status() >= 400) throw new Error(`Profile returned HTTP ${response.status()}`);
+                await page.waitForTimeout(1_500);
+                const profileStats = parseProfileStatsText(await page.locator('body').innerText());
+                if (profileStats) {
+                    detail.items_sold = profileStats.items_sold;
+                    detail.items_listed = profileStats.items_listed;
+                    detail.seller_stats_source = 'profile_page';
+                    detail.seller_stats_observed_at = new Date().toISOString();
+                } else {
+                    log.warning('Profile header did not expose sold/listed counts; using product-detail fallback', { sellerId, profileUrl });
+                }
+            } catch (error) {
+                log.warning('Profile statistics refresh failed; using product-detail fallback', {
+                    sellerId,
+                    profileUrl,
+                    error: String(error),
+                });
+            }
+        }
         sellerDetails.set(sellerId, detail);
-        log.info('Seller detail enriched', { sellerId, itemsSold: detail.items_sold, country: detail.seller_country });
+        log.info('Seller detail enriched', {
+            sellerId,
+            itemsSold: detail.items_sold,
+            itemsListed: detail.items_listed,
+            statsSource: detail.seller_stats_source,
+            country: detail.seller_country,
+        });
     },
     failedRequestHandler: async ({ request }, error) => {
         const sellerId = String(request.userData.sellerId);

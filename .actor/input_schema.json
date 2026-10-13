@@ -97,6 +97,13 @@
       "editor": "checkbox",
       "default": true
     },
+    "refreshProfileStats": {
+      "title": "Refresh sold/listed counts from profile",
+      "type": "boolean",
+      "description": "After parsing product-detail statistics, visit the numeric Seller Profile in the same browser session and override sold/listed counts from the current profile header when available.",
+      "editor": "checkbox",
+      "default": true
+    },
     "maxConcurrency": {
       "title": "Discovery concurrency",
       "type": "integer",

@@ -9,6 +9,7 @@
   "minItemsListed": 1,
   "allowedSellerSegments": ["B2C", "C2C", "UNKNOWN"],
   "requireSellerDetails": true,
+  "refreshProfileStats": true,
   "maxConcurrency": 1,
   "maxSellerDetailConcurrency": 3,
   "maxRequestRetries": 2,

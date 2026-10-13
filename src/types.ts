@@ -22,6 +22,7 @@ export interface ActorInput {
     minItemsListed?: unknown;
     allowedSellerSegments?: unknown;
     requireSellerDetails?: unknown;
+    refreshProfileStats?: unknown;
     maxConcurrency?: unknown;
     maxSellerDetailConcurrency?: unknown;
     maxRequestRetries?: unknown;
@@ -49,6 +50,7 @@ export interface NormalizedInput {
     minItemsListed: number;
     allowedSellerSegments: SellerSegment[];
     requireSellerDetails: boolean;
+    refreshProfileStats: boolean;
     maxConcurrency: number;
     maxSellerDetailConcurrency: number;
     maxRequestRetries: number;
@@ -112,6 +114,8 @@ export interface SellerDetail {
     vacation_active: boolean | null;
     detail_category: string | null;
     detail_source_url: string;
+    seller_stats_source: 'product_detail' | 'profile_page';
+    seller_stats_observed_at: string;
 }
 
 export interface SellerAggregate {
@@ -157,6 +161,8 @@ export interface LeadRecord {
     sample_product_urls: string[];
     seller_detail_source_url: string | null;
     seller_detail_status: 'enriched' | 'unavailable';
+    seller_stats_source: 'product_detail' | 'profile_page' | 'unavailable';
+    seller_stats_observed_at: string;
     lead_score: number;
     qualification: Qualification;
     qualification_reasons: string[];

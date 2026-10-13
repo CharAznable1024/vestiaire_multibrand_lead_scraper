@@ -41,6 +41,7 @@ No login is used. The Actor processes public listing and product-detail data. It
 | `minItemsListed` | 1 | Minimum public `products_listed`. |
 | `allowedSellerSegments` | B2C, C2C, UNKNOWN | Allowed public seller segments. |
 | `requireSellerDetails` | true | Exclude sellers whose public statistics cannot be parsed. |
+| `refreshProfileStats` | true | Override potentially stale product-detail sold/listed counts with the current numeric Profile header when available. |
 | `dedupeMode` | new_and_updated | Emit all, only new, or new and changed sellers. |
 | `contactEnrichment` | true | Discover and verify public business websites and contacts. |
 | `maxContactEnrichmentLeads` | 10 | Maximum paid website searches per uncached run. |

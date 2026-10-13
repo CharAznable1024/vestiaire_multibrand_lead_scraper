@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseSellerDetailJson } from '../src/seller-detail.js';
+import { parseProfileStatsText, parseSellerDetailJson } from '../src/seller-detail.js';
 
 describe('seller detail parser', () => {
     it('extracts public seller statistics, profile identity, country, and category', () => {
@@ -46,6 +46,14 @@ describe('seller detail parser', () => {
             items_listed: 120,
             seller_badge: 'Expert',
             detail_category: 'Travel bags',
+            seller_stats_source: 'product_detail',
+        });
+    });
+
+    it('parses current sold/listed counts from the public profile header', () => {
+        expect(parseProfileStatsText('United States\n7 items for sale\n18 sold\nUsually ships in 1-2 days')).toEqual({
+            items_sold: 18,
+            items_listed: 7,
         });
     });
 });

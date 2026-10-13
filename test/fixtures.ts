@@ -41,8 +41,10 @@ export function sellerDetail(overrides: Partial<SellerDetail> = {}): SellerDetai
         vacation_active: false,
         detail_category: 'Handbags',
         detail_source_url: 'https://us.vestiairecollective.com/item-1.shtml',
+        seller_stats_source: 'product_detail',
+        seller_stats_observed_at: '2026-10-12T00:00:00.000Z',
         ...overrides,
-    };
+    } as SellerDetail;
 }
 
 export function merchantLead(): LeadRecord {

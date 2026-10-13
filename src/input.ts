@@ -89,6 +89,7 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         minItemsListed: integer(input.minItemsListed, 1, 0, 1_000_000, 'minItemsListed'),
         allowedSellerSegments,
         requireSellerDetails: boolean(input.requireSellerDetails, true, 'requireSellerDetails'),
+        refreshProfileStats: boolean(input.refreshProfileStats, true, 'refreshProfileStats'),
         maxConcurrency: integer(input.maxConcurrency, 1, 1, 3, 'maxConcurrency'),
         maxSellerDetailConcurrency: integer(
             input.maxSellerDetailConcurrency,

@@ -72,9 +72,21 @@ export function parseSellerDetailJson(value: unknown, detailSourceUrl: string): 
         vacation_active: typeof vacation.active === 'boolean' ? vacation.active : null,
         detail_category: string(category.localized_name ?? category.name),
         detail_source_url: detailSourceUrl,
+        seller_stats_source: 'product_detail',
+        seller_stats_observed_at: new Date().toISOString(),
     };
 }
 
 export function parseSellerDetailNextData(json: string, detailSourceUrl: string): SellerDetail | null {
     return parseSellerDetailJson(JSON.parse(json), detailSourceUrl);
+}
+
+export function parseProfileStatsText(text: string): { items_sold: number; items_listed: number } | null {
+    const normalized = text.replace(/\s+/g, ' ');
+    const match = normalized.match(/([\d,.]+)\s+items?\s+for\s+sale\s+([\d,.]+)\s+sold/i);
+    if (!match) return null;
+    const itemsListed = Number(match[1].replace(/,/g, ''));
+    const itemsSold = Number(match[2].replace(/,/g, ''));
+    if (!Number.isFinite(itemsListed) || !Number.isFinite(itemsSold)) return null;
+    return { items_sold: itemsSold, items_listed: itemsListed };
 }
