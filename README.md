@@ -45,7 +45,7 @@ No login is used. The Actor processes public listing and product-detail data. It
 | `allowedSellerSegments` | B2C, C2C, UNKNOWN | Allowed public seller segments. |
 | `requireSellerDetails` | true | Exclude sellers whose public statistics cannot be parsed. |
 | `refreshProfileStats` | true | Override potentially stale product-detail sold/listed counts with the current numeric Profile header when available. |
-| `autoMarketProxy` | true | Use the selected market's country with Apify Residential Proxy; custom proxy URLs take precedence. |
+| `autoMarketProxy` | false | Optional: use the selected market's country with Apify Residential Proxy when the site blocks the default route; custom proxy URLs take precedence. |
 | `dedupeMode` | new_and_updated | Emit all, only new, or new and changed sellers. |
 | `contactEnrichment` | true | Discover and verify public business websites and contacts. |
 | `maxContactEnrichmentLeads` | 10 | Maximum paid website searches per uncached run. |
@@ -109,7 +109,7 @@ The main cost drivers are:
 
 - one browser search/category page per discovery source and page
 - one representative product detail per candidate seller, capped by `maxSellerDetailCandidates`
-- the automatic market-matched Apify Proxy session; optional residential proxy transfer can add additional cost
+- optional market-matched Apify Residential Proxy transfer when the default route is blocked
 - one downstream Google search page per uncached contact candidate, capped by `maxContactEnrichmentLeads`
 - Dataset and named KV operations
 

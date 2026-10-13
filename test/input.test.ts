@@ -9,7 +9,7 @@ describe('normalizeInput', () => {
         expect(input.maxListingsPerQuery).toBe(48);
         expect(input.maxSellers).toBe(25);
         expect(input.maxSellerDetailCandidates).toBe(100);
-        expect(input.autoMarketProxy).toBe(true);
+        expect(input.autoMarketProxy).toBe(false);
         expect(input.minItemsSold).toBe(5);
         expect(input.dedupeStoreName).toBe('vestiaire-merchant-lead-state-v2');
     });

@@ -118,7 +118,7 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
         maxRequestRetries: integer(input.maxRequestRetries, 2, 0, 5, 'maxRequestRetries'),
         navigationTimeoutSecs: integer(input.navigationTimeoutSecs, 60, 15, 180, 'navigationTimeoutSecs'),
         proxyConfiguration: proxy(input.proxyConfiguration),
-        autoMarketProxy: boolean(input.autoMarketProxy, true, 'autoMarketProxy'),
+        autoMarketProxy: boolean(input.autoMarketProxy, false, 'autoMarketProxy'),
         dedupeMode,
         dedupeStoreName: text(
             input.dedupeStoreName,

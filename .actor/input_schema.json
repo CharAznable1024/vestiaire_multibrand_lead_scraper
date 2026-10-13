@@ -164,7 +164,7 @@
       "type": "boolean",
       "description": "Uses the Apify Residential Proxy with the selected market's country for the browser session. Turn off only when custom proxy URLs already provide the correct market location.",
       "editor": "checkbox",
-      "default": true
+      "default": false
     },
     "dedupeMode": {
       "title": "Cross-run deduplication mode",

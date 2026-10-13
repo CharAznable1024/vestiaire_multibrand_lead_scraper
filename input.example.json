@@ -16,7 +16,7 @@
   "maxSellerDetailConcurrency": 3,
   "maxRequestRetries": 2,
   "navigationTimeoutSecs": 60,
-  "autoMarketProxy": true,
+  "autoMarketProxy": false,
   "dedupeMode": "new_and_updated",
   "dedupeStoreName": "vestiaire-merchant-lead-state-v2",
   "reemitAfterDays": 30,
