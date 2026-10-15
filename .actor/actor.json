@@ -5,6 +5,7 @@
   "title": "Vestiaire Merchant Lead Scraper",
   "description": "Discover Vestiaire merchant leads with public seller sales, inventory, profile, category, country, and business contact evidence.",
   "version": "0.2",
+  "buildTag": "latest",
   "meta": {
     "templateId": "ts-crawlee-playwright-chrome",
     "generatedBy": "TRAE with GPT-5"

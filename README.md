@@ -133,7 +133,9 @@ apify run --input-file input.example.json
 
 ```bash
 apify login
-apify push
+apify push iMhgCHOQdXSjkmR7Z --force --build-tag latest --wait-for-finish 600
 ```
+
+`git push` updates the GitHub source repository but does not deploy this Actor. Run `apify push` after pushing the tested commit; the explicit Actor ID prevents deploying to a similarly named Actor, and `--build-tag latest` makes normal Console and Bot runs use the new successful build.
 
 Run on the Apify platform before treating changes as production-ready. Vestiaire can change public page structures or bot-protection rules without notice. Users remain responsible for website terms, privacy, intellectual property, and applicable law.
