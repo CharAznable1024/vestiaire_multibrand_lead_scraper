@@ -157,7 +157,7 @@ async function recoverListingSourceWithBrightData(url: string, source: string): 
 const searchCrawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxConcurrency: input.maxConcurrency,
-    maxRequestRetries: brightData ? 0 : input.maxRequestRetries,
+    maxRequestRetries: input.maxRequestRetries,
     requestHandlerTimeoutSecs: input.navigationTimeoutSecs * 2 + 45,
     navigationTimeoutSecs: input.navigationTimeoutSecs,
     useSessionPool: true,
@@ -324,7 +324,7 @@ sellerDetailAttempted = aggregates.length;
 const detailCrawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxConcurrency: input.maxSellerDetailConcurrency,
-    maxRequestRetries: brightData ? 0 : input.maxRequestRetries,
+    maxRequestRetries: input.maxRequestRetries,
     requestHandlerTimeoutSecs: input.navigationTimeoutSecs + 30,
     navigationTimeoutSecs: input.navigationTimeoutSecs,
     useSessionPool: true,
