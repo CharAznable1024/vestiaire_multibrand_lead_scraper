@@ -45,7 +45,7 @@ No login is used. The Actor processes public listing and product-detail data. It
 | `allowedSellerSegments` | B2C, C2C, UNKNOWN | Allowed public seller segments. |
 | `requireSellerDetails` | true | Exclude sellers whose public statistics cannot be parsed. |
 | `refreshProfileStats` | true | Override potentially stale product-detail sold/listed counts with the current numeric Profile header when available. |
-| `autoMarketProxy` | false | Optional: use the selected market's country with Apify Residential Proxy when the site blocks the default route; custom proxy URLs take precedence. |
+| `autoMarketProxy` | false | Legacy compatibility option. With Bright Data configured, the Actor automatically uses Direct first and Bright Data only after a block. |
 | `dedupeMode` | new_and_updated | Emit all, only new, or new and changed sellers. |
 | `contactEnrichment` | true | Discover and verify public business websites and contacts. |
 | `maxContactEnrichmentLeads` | 10 | Maximum paid website searches per uncached run. |
@@ -103,13 +103,21 @@ The Actor calls `apify/google-search-scraper` for a bounded number of high-scori
 
 This downstream Actor adds a per-search-page cost. Contact evidence is cached for `contactCacheDays`.
 
+## Automatic access fallback
+
+The Actor does not require operators to choose an access provider. It tries Direct Playwright first. When a listing source, product detail, seller detail, or Profile page is blocked, it automatically calls Bright Data Web Unlocker and continues the same parsing pipeline. If unlocked listing HTML is returned, product links are opened and converted back into the normal seller-evidence model before qualification and deduplication.
+
+The run summary records `bright_data_request_attempts`, `bright_data_successful_requests`, `bright_data_recovered_pages`, and `bright_data_estimated_cost_usd`. Only non-empty responses without a Bright Data error header count as successful requests. The current account price is estimated at `$0.0015` per successful request.
+
+Bright Data may reject specific domains until account KYC is completed. The Actor preserves the exact Bright Data policy error in `failed_sources` instead of reporting an empty marketplace.
+
 ## Cost controls
 
 The main cost drivers are:
 
 - one browser search/category page per discovery source and page
 - one representative product detail per candidate seller, capped by `maxSellerDetailCandidates`
-- optional market-matched Apify Residential Proxy transfer when the default route is blocked
+- Bright Data fallback requests only after Direct Playwright is blocked, estimated at $1.50 per 1,000 successful requests
 - one downstream Google search page per uncached contact candidate, capped by `maxContactEnrichmentLeads`
 - Dataset and named KV operations
 

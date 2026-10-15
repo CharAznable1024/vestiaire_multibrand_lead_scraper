@@ -229,6 +229,11 @@ export interface RunSummary {
     qualified_lead_count: number;
     emitted_lead_count: number;
     duplicate_suppressed_count: number;
+    bright_data_configured: boolean;
+    bright_data_request_attempts: number;
+    bright_data_successful_requests: number;
+    bright_data_recovered_pages: number;
+    bright_data_estimated_cost_usd: number;
     contact_enrichment_attempted: number;
     contact_enrichment_verified: number;
     contact_enrichment_cached: number;

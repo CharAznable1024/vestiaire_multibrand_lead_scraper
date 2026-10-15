@@ -1,6 +1,13 @@
 import { PlaywrightCrawler } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
 
+import {
+    BrightDataWebUnlocker,
+    extractNextDataJson,
+    extractUnlockedProductUrls,
+    htmlToVisibleText,
+    type BrightDataResult,
+} from './bright-data.js';
 import { enrichContacts } from './contact-enrichment.js';
 import { applyCrossRunDedupe, normalizePersistentState } from './dedupe.js';
 import { normalizeInput } from './input.js';
@@ -8,13 +15,22 @@ import { aggregateSellers, buildMerchantLeads, countSellers, merchantLeadFilterR
 import { globalSearchUrl, marketCatalogUrl, marketProxyCountry, searchUrl, sellerProfileUrl, shippedFromSearchUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
 import { captureSearchResponse, fetchSearchPageWithRetries } from './search.js';
-import { parseProfileStatsText, parseSellerDetailNextData } from './seller-detail.js';
+import { parseProductDetailEvidenceNextData, parseProfileStatsText, parseSellerDetailNextData } from './seller-detail.js';
 import type { ActorInput, CapturedSearchResponse, ProductRecord, RawSearchResponse, RunSummary, SellerDetail } from './types.js';
 
 await Actor.init();
 
 const input = normalizeInput(await Actor.getInput<ActorInput>());
 const startedAt = new Date().toISOString();
+const brightDataApiKey = process.env.BRIGHT_DATA_API_KEY?.trim();
+const brightData = brightDataApiKey
+    ? new BrightDataWebUnlocker({
+          apiKey: brightDataApiKey,
+          zone: process.env.BRIGHT_DATA_ZONE?.trim() || 'ebay_live_unlocker',
+          country: marketProxyCountry(input.country),
+          timeoutMillis: Math.max(60_000, input.navigationTimeoutSecs * 1_000),
+      })
+    : null;
 const effectiveStartUrls =
     input.searchQueries.length === 0 && input.startUrls.length === 0
         ? [input.sellerCountries.length ? globalSearchUrl() : marketCatalogUrl(input.country)]
@@ -24,10 +40,12 @@ const sellerDetails = new Map<string, SellerDetail>();
 const failedSources: Array<{ source: string; error: string }> = [];
 const failedSellerDetails = new Set<string>();
 const capturedResponses = new Map<string, Promise<CapturedSearchResponse>>();
+const unlockedProductSources = new Map<string, string>();
 let sellerDetailAttempted = 0;
 let qualifiedLeadCount = 0;
 let emittedLeadCount = 0;
 let duplicateSuppressedCount = 0;
+let brightDataRecoveredPages = 0;
 let contactEnrichmentAttempted = 0;
 let contactEnrichmentVerified = 0;
 let contactEnrichmentCached = 0;
@@ -50,6 +68,11 @@ const summary = (status: RunSummary['status']): RunSummary => ({
     qualified_lead_count: qualifiedLeadCount,
     emitted_lead_count: emittedLeadCount,
     duplicate_suppressed_count: duplicateSuppressedCount,
+    bright_data_configured: brightData !== null,
+    bright_data_request_attempts: brightData?.requestAttempts ?? 0,
+    bright_data_successful_requests: brightData?.successfulRequests ?? 0,
+    bright_data_recovered_pages: brightDataRecoveredPages,
+    bright_data_estimated_cost_usd: brightData?.estimatedCostUsd ?? 0,
     contact_enrichment_attempted: contactEnrichmentAttempted,
     contact_enrichment_verified: contactEnrichmentVerified,
     contact_enrichment_cached: contactEnrichmentCached,
@@ -67,7 +90,11 @@ await Actor.setValue('OUTPUT', summary('RUNNING'));
 
 const proxyInput = input.proxyConfiguration;
 const usesCustomProxyUrls = (proxyInput.proxyUrls?.length ?? 0) > 0;
-const useApifyMarketProxy = !usesCustomProxyUrls && (input.autoMarketProxy || proxyInput.useApifyProxy === true);
+// Direct Playwright is the primary route. When Bright Data is configured,
+// suppress the legacy automatic Residential route and use Web Unlocker only
+// after an actual block. Explicit proxyConfiguration still takes precedence.
+const useApifyMarketProxy =
+    !usesCustomProxyUrls && (proxyInput.useApifyProxy === true || (input.autoMarketProxy && brightData === null));
 const wantsProxy = useApifyMarketProxy || usesCustomProxyUrls;
 const proxyConfiguration = wantsProxy
     ? await Actor.createProxyConfiguration({
@@ -85,15 +112,52 @@ const proxyConfiguration = wantsProxy
 log.info('Market routing configured', {
     market: input.country,
     autoMarketProxy: input.autoMarketProxy,
+    autoMarketProxySuppressedByBrightData: input.autoMarketProxy && brightData !== null && proxyInput.useApifyProxy !== true,
+    brightDataFallbackConfigured: brightData !== null,
     proxyMode: usesCustomProxyUrls ? 'custom_urls' : useApifyMarketProxy ? 'apify_market_proxy' : 'disabled',
     proxyGroups: usesCustomProxyUrls ? undefined : proxyInput.apifyProxyGroups?.length ? proxyInput.apifyProxyGroups : ['RESIDENTIAL'],
     proxyCountry: usesCustomProxyUrls ? undefined : proxyInput.apifyProxyCountry ?? marketProxyCountry(input.country),
 });
 
+function ingestUnlockedProductDetail(json: string, source: string, detailUrl: string): void {
+    const evidence = parseProductDetailEvidenceNextData(json, source, input.country, detailUrl);
+    if (!evidence) throw new Error('Unlocked product detail did not contain usable seller evidence');
+    productsById.set(evidence.product.item_id, evidence.product);
+    sellerDetails.set(evidence.detail.seller_id, evidence.detail);
+}
+
+async function recoverListingSourceWithBrightData(url: string, source: string): Promise<number> {
+    if (!brightData) throw new Error('Bright Data fallback is not configured');
+    let result: BrightDataResult;
+    try {
+        result = await brightData.fetch(url, { render: true, maxAttempts: 1 });
+    } catch (renderedError) {
+        try {
+            // The non-rendered retry also exposes Bright Data policy errors
+            // (for example KYC requirements) that can otherwise arrive with
+            // an empty rendered body.
+            result = await brightData.fetch(url, { render: false, maxAttempts: 1 });
+        } catch (rawError) {
+            throw new Error(`rendered request: ${String(renderedError)}; raw request: ${String(rawError)}`);
+        }
+    }
+    const productUrls = extractUnlockedProductUrls(result.html, url).slice(0, input.maxListingsPerQuery);
+    if (!productUrls.length) throw new Error('Bright Data returned HTML without Vestiaire product links');
+    for (const productUrl of productUrls) unlockedProductSources.set(productUrl, source);
+    brightDataRecoveredPages += 1;
+    log.warning('Listing source recovered through Bright Data', {
+        source,
+        productUrls: productUrls.length,
+        brightDataSuccessfulRequests: brightData.successfulRequests,
+        brightDataEstimatedCostUsd: brightData.estimatedCostUsd,
+    });
+    return productUrls.length;
+}
+
 const searchCrawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxConcurrency: input.maxConcurrency,
-    maxRequestRetries: input.maxRequestRetries,
+    maxRequestRetries: brightData ? 0 : input.maxRequestRetries,
     requestHandlerTimeoutSecs: input.navigationTimeoutSecs * 2 + 45,
     navigationTimeoutSecs: input.navigationTimeoutSecs,
     useSessionPool: true,
@@ -145,10 +209,21 @@ const searchCrawler = new PlaywrightCrawler({
     },
     failedRequestHandler: async ({ request }, error) => {
         const source = String(request.userData.source);
-        const message = error instanceof Error ? error.message : String(error);
-        failedSources.push({ source, error: message.slice(0, 500) });
+        const directError = error instanceof Error ? error.message : String(error);
         capturedResponses.delete(responseKey(request));
-        log.error('Listing source failed', { source, error: message });
+        if (brightData) {
+            try {
+                await recoverListingSourceWithBrightData(request.url, source);
+                return;
+            } catch (brightDataError) {
+                const message = `${directError}; Bright Data fallback failed: ${String(brightDataError)}`;
+                failedSources.push({ source, error: message.slice(0, 500) });
+                log.error('Listing source failed after Bright Data fallback', { source, error: message });
+                return;
+            }
+        }
+        failedSources.push({ source, error: directError.slice(0, 500) });
+        log.error('Listing source failed', { source, error: directError });
     },
 });
 
@@ -175,9 +250,64 @@ const listingSources = input.sellerCountries.length
     : unfilteredListingSources;
 await searchCrawler.run(listingSources);
 
+if (unlockedProductSources.size > 0) {
+    const fallbackProductUrls = [...unlockedProductSources.keys()].slice(0, input.maxSellerDetailCandidates);
+    const unlockedDetailCrawler = new PlaywrightCrawler({
+        proxyConfiguration: usesCustomProxyUrls ? proxyConfiguration : undefined,
+        maxConcurrency: input.maxSellerDetailConcurrency,
+        maxRequestRetries: 0,
+        requestHandlerTimeoutSecs: input.navigationTimeoutSecs + 30,
+        navigationTimeoutSecs: input.navigationTimeoutSecs,
+        useSessionPool: true,
+        persistCookiesPerSession: true,
+        launchContext: { launchOptions: { headless: true, args: ['--disable-gpu'] } },
+        requestHandler: async ({ page, request }) => {
+            const json = await page.locator('script#__NEXT_DATA__').textContent({ timeout: input.navigationTimeoutSecs * 1_000 });
+            if (!json) throw new Error('Fallback product detail did not contain __NEXT_DATA__');
+            ingestUnlockedProductDetail(json, String(request.userData.source), request.loadedUrl ?? request.url);
+        },
+        failedRequestHandler: async ({ request }, error) => {
+            const source = String(request.userData.source);
+            if (!brightData) {
+                log.warning('Unlocked product evidence unavailable', { url: request.url, error: String(error) });
+                return;
+            }
+            try {
+                const result = await brightData.fetch(request.url, { render: false, maxAttempts: 2 });
+                const json = extractNextDataJson(result.html);
+                if (!json) throw new Error('Bright Data product detail did not contain __NEXT_DATA__');
+                ingestUnlockedProductDetail(json, source, request.url);
+                brightDataRecoveredPages += 1;
+                log.warning('Product evidence recovered through Bright Data', {
+                    url: request.url,
+                    brightDataSuccessfulRequests: brightData.successfulRequests,
+                });
+            } catch (brightDataError) {
+                log.warning('Unlocked product evidence unavailable after Bright Data fallback', {
+                    url: request.url,
+                    directError: String(error),
+                    brightDataError: String(brightDataError),
+                });
+            }
+        },
+    });
+    await unlockedDetailCrawler.run(
+        fallbackProductUrls.map((url) => ({
+            url,
+            uniqueKey: `unlocked-product:${url}`,
+            userData: { source: unlockedProductSources.get(url) },
+        })),
+    );
+}
+
 if (failedSources.length === listingSources.length) {
     await Actor.setValue('OUTPUT', summary('FAILED'));
     throw new Error('All listing sources failed. Review OUTPUT and run logs.');
+}
+
+if (!productsById.size) {
+    await Actor.setValue('OUTPUT', summary('FAILED'));
+    throw new Error('Listing sources returned no usable product evidence. Review OUTPUT and run logs.');
 }
 
 const allAggregates = aggregateSellers([...productsById.values()]);
@@ -194,7 +324,7 @@ sellerDetailAttempted = aggregates.length;
 const detailCrawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxConcurrency: input.maxSellerDetailConcurrency,
-    maxRequestRetries: input.maxRequestRetries,
+    maxRequestRetries: brightData ? 0 : input.maxRequestRetries,
     requestHandlerTimeoutSecs: input.navigationTimeoutSecs + 30,
     navigationTimeoutSecs: input.navigationTimeoutSecs,
     useSessionPool: true,
@@ -227,11 +357,34 @@ const detailCrawler = new PlaywrightCrawler({
                     log.warning('Profile header did not expose sold/listed counts; using product-detail fallback', { sellerId, profileUrl });
                 }
             } catch (error) {
-                log.warning('Profile statistics refresh failed; using product-detail fallback', {
-                    sellerId,
-                    profileUrl,
-                    error: String(error),
-                });
+                let recovered = false;
+                if (brightData) {
+                    try {
+                        const result = await brightData.fetch(profileUrl, { render: true, maxAttempts: 2 });
+                        const profileStats = parseProfileStatsText(htmlToVisibleText(result.html));
+                        if (!profileStats) throw new Error('Unlocked profile did not expose sold/listed counts');
+                        detail.items_sold = profileStats.items_sold;
+                        detail.items_listed = profileStats.items_listed;
+                        detail.seller_stats_source = 'profile_page';
+                        detail.seller_stats_observed_at = new Date().toISOString();
+                        brightDataRecoveredPages += 1;
+                        recovered = true;
+                    } catch (brightDataError) {
+                        log.warning('Profile statistics refresh failed after Bright Data fallback', {
+                            sellerId,
+                            profileUrl,
+                            directError: String(error),
+                            brightDataError: String(brightDataError),
+                        });
+                    }
+                }
+                if (!recovered) {
+                    log.warning('Profile statistics refresh failed; using product-detail fallback', {
+                        sellerId,
+                        profileUrl,
+                        error: String(error),
+                    });
+                }
             }
         }
         sellerDetails.set(sellerId, detail);
@@ -247,17 +400,47 @@ const detailCrawler = new PlaywrightCrawler({
     },
     failedRequestHandler: async ({ request }, error) => {
         const sellerId = String(request.userData.sellerId);
+        if (brightData) {
+            try {
+                const result = await brightData.fetch(request.url, { render: false, maxAttempts: 2 });
+                const json = extractNextDataJson(result.html);
+                if (!json) throw new Error('Bright Data seller detail did not contain __NEXT_DATA__');
+                const detail = parseSellerDetailNextData(json, request.url);
+                if (!detail) throw new Error('Could not parse Bright Data seller detail');
+                if (detail.seller_id !== sellerId) {
+                    throw new Error(`Seller ID mismatch: expected ${sellerId}, got ${detail.seller_id}`);
+                }
+                sellerDetails.set(sellerId, detail);
+                brightDataRecoveredPages += 1;
+                log.warning('Seller detail recovered through Bright Data', {
+                    sellerId,
+                    countryCode: detail.seller_country_code,
+                    brightDataSuccessfulRequests: brightData.successfulRequests,
+                });
+                return;
+            } catch (brightDataError) {
+                failedSellerDetails.add(sellerId);
+                log.warning('Seller detail unavailable after Bright Data fallback', {
+                    sellerId,
+                    directError: String(error),
+                    brightDataError: String(brightDataError),
+                });
+                return;
+            }
+        }
         failedSellerDetails.add(sellerId);
         log.warning('Seller detail unavailable', { sellerId, error: String(error) });
     },
 });
 
 await detailCrawler.run(
-    aggregates.map((aggregate) => ({
-        url: aggregate.products[0].item_url,
-        uniqueKey: `seller-detail:${aggregate.seller_id}`,
-        userData: { sellerId: aggregate.seller_id },
-    })),
+    aggregates
+        .filter((aggregate) => !sellerDetails.has(aggregate.seller_id))
+        .map((aggregate) => ({
+            url: aggregate.products[0].item_url,
+            uniqueKey: `seller-detail:${aggregate.seller_id}`,
+            userData: { sellerId: aggregate.seller_id },
+        })),
 );
 
 const scrapedAt = new Date().toISOString();

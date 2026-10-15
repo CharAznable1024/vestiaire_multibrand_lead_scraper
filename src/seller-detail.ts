@@ -1,4 +1,11 @@
-import type { SellerDetail, SellerSegment } from './types.js';
+import { absoluteProductUrl } from './market.js';
+import { categoryFromProductPath } from './normalize.js';
+import type { Market, ProductRecord, SellerDetail, SellerSegment } from './types.js';
+
+export interface ProductDetailEvidence {
+    product: ProductRecord;
+    detail: SellerDetail;
+}
 
 function object(value: unknown): Record<string, unknown> {
     return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -98,6 +105,55 @@ export function parseSellerDetailJson(value: unknown, detailSourceUrl: string): 
 
 export function parseSellerDetailNextData(json: string, detailSourceUrl: string): SellerDetail | null {
     return parseSellerDetailJson(JSON.parse(json), detailSourceUrl);
+}
+
+export function parseProductDetailEvidenceJson(
+    value: unknown,
+    sourceQuery: string,
+    market: Market,
+    detailSourceUrl: string,
+): ProductDetailEvidence | null {
+    const product = findProduct(value);
+    const detail = parseSellerDetailJson(value, detailSourceUrl);
+    if (!product || !detail) return null;
+    const itemId = string(product.id);
+    if (!itemId) return null;
+    const brand = object(product.brand);
+    const price = object(product.price);
+    const seller = object(product.seller);
+    const cents = number(price.cents);
+    const itemUrl = absoluteProductUrl(detailSourceUrl, market);
+    const { category, categoryPath } = categoryFromProductPath(itemUrl);
+
+    return {
+        detail,
+        product: {
+            source_query: sourceQuery,
+            item_id: itemId,
+            title: string(product.name) ?? `Vestiaire product ${itemId}`,
+            brand: string(brand.name),
+            category,
+            category_path: categoryPath,
+            country: string(product.country),
+            item_url: itemUrl,
+            price_amount: cents === null ? null : cents / 100,
+            price_currency: string(price.currency),
+            likes: Math.max(0, Math.trunc(number(product.likes) ?? 0)),
+            seller_id: detail.seller_id,
+            seller_display_name: detail.seller_name,
+            seller_badge: detail.seller_badge,
+            is_official_store: seller.isOfficialStore === true,
+        },
+    };
+}
+
+export function parseProductDetailEvidenceNextData(
+    json: string,
+    sourceQuery: string,
+    market: Market,
+    detailSourceUrl: string,
+): ProductDetailEvidence | null {
+    return parseProductDetailEvidenceJson(JSON.parse(json), sourceQuery, market, detailSourceUrl);
 }
 
 export function parseProfileStatsText(text: string): { items_sold: number; items_listed: number } | null {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseProfileStatsText, parseSellerDetailJson } from '../src/seller-detail.js';
+import { parseProductDetailEvidenceJson, parseProfileStatsText, parseSellerDetailJson } from '../src/seller-detail.js';
 
 describe('seller detail parser', () => {
     it('extracts public seller statistics, profile identity, country, and category', () => {
@@ -84,5 +84,45 @@ describe('seller detail parser', () => {
         );
 
         expect(detail?.seller_country_code).toBe(expectedCode);
+    });
+
+    it('builds listing evidence from a product-detail payload used by unlocked discovery', () => {
+        const evidence = parseProductDetailEvidenceJson(
+            {
+                props: {
+                    pageProps: {
+                        product: {
+                            id: '62617435',
+                            name: 'Ophidia bag',
+                            brand: { name: 'Gucci' },
+                            price: { cents: 123400, currency: 'GBP' },
+                            likes: 8,
+                            category: { name: 'Handbags' },
+                            seller: {
+                                id: '26937465',
+                                firstname: 'The Store',
+                                country: 'United Kingdom',
+                                country_i_s_o: 'FR',
+                                statistics: { products_sold: 34, products_listed: 120 },
+                            },
+                        },
+                    },
+                },
+            },
+            'unlocked GB search',
+            'GB',
+            'https://uk.vestiairecollective.com/women-bags/handbags/gucci/ophidia-62617435.shtml',
+        );
+
+        expect(evidence).toMatchObject({
+            product: {
+                item_id: '62617435',
+                brand: 'Gucci',
+                category: 'Handbags',
+                price_amount: 1234,
+                seller_id: '26937465',
+            },
+            detail: { seller_country_code: 'GB' },
+        });
     });
 });

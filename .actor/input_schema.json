@@ -160,9 +160,9 @@
       "maximum": 180
     },
     "autoMarketProxy": {
-      "title": "Use a proxy matched to the selected market",
+      "title": "Legacy Apify market proxy",
       "type": "boolean",
-      "description": "Uses the Apify Residential Proxy with the selected market's country for the browser session. Turn off only when custom proxy URLs already provide the correct market location.",
+      "description": "Compatibility option used only when Bright Data fallback is unavailable. Normal operation automatically tries direct Playwright first and Bright Data after a block.",
       "editor": "checkbox",
       "default": false
     },
