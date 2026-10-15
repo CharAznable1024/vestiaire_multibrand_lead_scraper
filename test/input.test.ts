@@ -15,10 +15,10 @@ describe('normalizeInput', () => {
     });
 
     it('defaults to unfiltered market discovery and supports seller-country filters', () => {
-        const input = normalizeInput({ sellerCountries: ['us', 'FR'] });
+        const input = normalizeInput({ sellerCountries: ['us', 'FR', 'uk', 'GB'] });
         expect(input.searchQueries).toEqual([]);
         expect(input.startUrls).toEqual([]);
-        expect(input.sellerCountries).toEqual(['US', 'FR']);
+        expect(input.sellerCountries).toEqual(['US', 'FR', 'GB']);
     });
 
     it('accepts filtered Vestiaire URLs and validates the host', () => {

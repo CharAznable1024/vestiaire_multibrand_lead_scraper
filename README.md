@@ -35,7 +35,7 @@ No login is used. The Actor processes public listing and product-detail data. It
 | `searchQueries` | empty | Optional brand, category, or product phrases. Empty input does not apply a brand filter. |
 | `startUrls` | empty | Optional filtered Vestiaire search/category/brand URLs. |
 | `country` | US | Vestiaire market domain, localized price environment, and default proxy geography. |
-| `sellerCountries` | empty | Optional seller-country ISO filters. Each becomes a public **Shipped From** URL source such as `#country=GB`, then is verified from Seller Detail. Empty means all public seller countries. |
+| `sellerCountries` | empty | Optional seller-country ISO filters. Each becomes a public **Shipped From** URL source such as `#country=GB`, then is verified from Seller Detail. United Kingdom is stored as `GB`; `UK` is accepted as an input alias. Empty means all public seller countries. |
 | `maxListingsPerQuery` | 48 | Listing cards sampled per source. |
 | `maxPagesPerQuery` | 1 | Pagination cap per source. |
 | `maxSellers` | 25 | Maximum qualified merchant leads emitted to the Dataset. |

@@ -56,4 +56,32 @@ describe('seller detail parser', () => {
             items_listed: 7,
         });
     });
+
+    it.each([
+        [{ country: 'United Kingdom' }, 'GB'],
+        [{ country: 'United Kingdom', country_i_s_o: 'UK' }, 'GB'],
+        [{ country: 'United Kingdom', country_i_s_o: 'GB' }, 'GB'],
+    ])('normalizes the United Kingdom country code to GB', (countryFields, expectedCode) => {
+        const detail = parseSellerDetailJson(
+            {
+                props: {
+                    pageProps: {
+                        product: {
+                            id: '62617435',
+                            name: 'Ophidia bag',
+                            category: { name: 'Travel bags' },
+                            seller: {
+                                id: '26937465',
+                                ...countryFields,
+                                statistics: { products_sold: 34, products_listed: 120 },
+                            },
+                        },
+                    },
+                },
+            },
+            'https://example.com/product',
+        );
+
+        expect(detail?.seller_country_code).toBe(expectedCode);
+    });
 });

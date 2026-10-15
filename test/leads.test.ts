@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { normalizeInput } from '../src/input.js';
-import { aggregateSellers, buildMerchantLeads } from '../src/leads.js';
+import { aggregateSellers, buildMerchantLeads, merchantLeadFilterReason } from '../src/leads.js';
 import { product, sellerDetail } from './fixtures.js';
 
 describe('merchant lead aggregation', () => {
@@ -49,5 +49,12 @@ describe('merchant lead aggregation', () => {
         const details = new Map([['seller-1', sellerDetail({ seller_country: 'United Kingdom', seller_country_code: 'GB' })]]);
 
         expect(buildMerchantLeads(aggregates, details, input, 'GB', 'now')).toHaveLength(1);
+    });
+
+    it('reports a missing seller country code as the filter reason', () => {
+        const input = normalizeInput({ sellerCountries: ['GB'], minItemsSold: 0, minItemsListed: 0 });
+        const detail = sellerDetail({ seller_country: 'United Kingdom', seller_country_code: null });
+
+        expect(merchantLeadFilterReason(detail, input)).toBe('seller_country_code_missing');
     });
 });

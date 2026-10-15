@@ -15,6 +15,33 @@ interface ScoreResult {
     reasons: string[];
 }
 
+export type MerchantLeadFilterReason =
+    | 'seller_detail_missing'
+    | 'items_sold_missing'
+    | 'items_sold_below_minimum'
+    | 'items_listed_below_minimum'
+    | 'seller_country_code_missing'
+    | 'seller_country_not_allowed'
+    | 'seller_segment_not_allowed';
+
+export function merchantLeadFilterReason(
+    detail: SellerDetail | undefined,
+    input: NormalizedInput,
+): MerchantLeadFilterReason | null {
+    if (input.requireSellerDetails && !detail) return 'seller_detail_missing';
+    if (input.requireSellerDetails && detail?.items_sold === null) return 'items_sold_missing';
+    if ((detail?.items_sold ?? -1) < input.minItemsSold) return 'items_sold_below_minimum';
+    if ((detail?.items_listed ?? -1) < input.minItemsListed) return 'items_listed_below_minimum';
+    const sellerCountryCode = detail?.seller_country_code?.toUpperCase();
+    if (input.sellerCountries.length > 0) {
+        if (!sellerCountryCode) return 'seller_country_code_missing';
+        if (!input.sellerCountries.includes(sellerCountryCode)) return 'seller_country_not_allowed';
+    }
+    const sellerSegment = detail?.seller_segment ?? 'UNKNOWN';
+    if (!input.allowedSellerSegments.includes(sellerSegment)) return 'seller_segment_not_allowed';
+    return null;
+}
+
 function sellerScore(aggregate: SellerAggregate, detail: SellerDetail | undefined): ScoreResult {
     const reasons: string[] = [];
     const sold = detail?.items_sold ?? 0;
@@ -115,16 +142,7 @@ export function buildMerchantLeads(
     return aggregates
         .filter((aggregate) => {
             const detail = details.get(aggregate.seller_id);
-            if (input.requireSellerDetails && !detail) return false;
-            if (input.requireSellerDetails && detail?.items_sold === null) return false;
-            if ((detail?.items_sold ?? -1) < input.minItemsSold) return false;
-            if ((detail?.items_listed ?? -1) < input.minItemsListed) return false;
-            if (
-                input.sellerCountries.length > 0 &&
-                (!detail?.seller_country_code || !input.sellerCountries.includes(detail.seller_country_code.toUpperCase()))
-            ) return false;
-            const segment = detail?.seller_segment ?? 'UNKNOWN';
-            return input.allowedSellerSegments.includes(segment);
+            return merchantLeadFilterReason(detail, input) === null;
         })
         .map((aggregate) => {
             const detail = details.get(aggregate.seller_id);

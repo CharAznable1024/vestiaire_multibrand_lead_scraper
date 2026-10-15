@@ -19,6 +19,24 @@ function segment(value: unknown): SellerSegment {
     return normalized === 'B2C' || normalized === 'C2C' ? normalized : 'UNKNOWN';
 }
 
+function countryCode(value: unknown, countryName: unknown): string | null {
+    const normalizedCode = string(value)?.toUpperCase();
+    if (normalizedCode === 'UK') return 'GB';
+    if (normalizedCode) return normalizedCode;
+
+    const normalizedName = string(countryName)?.toLowerCase().replace(/[^a-z]/g, '');
+    if (
+        normalizedName === 'unitedkingdom' ||
+        normalizedName === 'greatbritain' ||
+        normalizedName === 'england' ||
+        normalizedName === 'scotland' ||
+        normalizedName === 'wales' ||
+        normalizedName === 'northernireland'
+    ) return 'GB';
+
+    return null;
+}
+
 function badgeNames(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
     return [...new Set(value.map((item) => string(object(item).name) ?? string(item)).filter((item): item is string => Boolean(item)))];
@@ -54,14 +72,15 @@ export function parseSellerDetailJson(value: unknown, detailSourceUrl: string): 
     const sellerRating = object(seller.seller_rating ?? seller.sellerRating);
     const vacation = object(seller.vacation);
     const category = object(product.category);
+    const sellerCountry = string(seller.country);
 
     return {
         seller_id: sellerId,
         seller_name: string(seller.firstname ?? seller.name),
         seller_username: string(seller.username),
         seller_segment: segment(seller.segment),
-        seller_country: string(seller.country),
-        seller_country_code: string(seller.country_i_s_o ?? seller.countryISO ?? seller.countryCode),
+        seller_country: sellerCountry,
+        seller_country_code: countryCode(seller.country_i_s_o ?? seller.countryISO ?? seller.countryCode, sellerCountry),
         seller_badge: string(sellerRating.badge ?? seller.badge),
         badges: badgeNames(seller.badges),
         items_sold: number(statistics.products_sold ?? statistics.productsSold),

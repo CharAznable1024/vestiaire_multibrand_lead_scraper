@@ -61,7 +61,14 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
 
     const country = (input.country ?? 'US') as Market;
     if (!MARKETS.has(country)) throw new Error(`Unsupported country: ${String(input.country)}`);
-    const sellerCountries = stringList(input.sellerCountries, [], 'sellerCountries', 50).map((value) => value.toUpperCase());
+    const sellerCountries = [
+        ...new Set(
+            stringList(input.sellerCountries, [], 'sellerCountries', 50).map((value) => {
+                const countryCode = value.toUpperCase();
+                return countryCode === 'UK' ? 'GB' : countryCode;
+            }),
+        ),
+    ];
     if (sellerCountries.some((value) => !/^[A-Z]{2}$/.test(value))) {
         throw new Error('sellerCountries must contain ISO 3166-1 alpha-2 country codes');
     }

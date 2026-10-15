@@ -35,7 +35,7 @@
     "sellerCountries": {
       "title": "Seller countries",
       "type": "array",
-      "description": "Optional ISO country-code filter applied through Vestiaire's public Shipped From listing filter and verified again from seller detail. Leave empty for all seller countries.",
+      "description": "Optional ISO country-code filter applied through Vestiaire's public Shipped From listing filter and verified again from seller detail. United Kingdom is canonicalized to GB; UK is accepted as an input alias. Leave empty for all seller countries.",
       "editor": "stringList",
       "default": [],
       "prefill": [],

@@ -4,7 +4,7 @@ import { Actor, log } from 'apify';
 import { enrichContacts } from './contact-enrichment.js';
 import { applyCrossRunDedupe, normalizePersistentState } from './dedupe.js';
 import { normalizeInput } from './input.js';
-import { aggregateSellers, buildMerchantLeads, countSellers } from './leads.js';
+import { aggregateSellers, buildMerchantLeads, countSellers, merchantLeadFilterReason } from './leads.js';
 import { globalSearchUrl, marketCatalogUrl, marketProxyCountry, searchUrl, sellerProfileUrl, shippedFromSearchUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
 import { captureSearchResponse, fetchSearchPageWithRetries } from './search.js';
@@ -241,6 +241,8 @@ const detailCrawler = new PlaywrightCrawler({
             itemsListed: detail.items_listed,
             statsSource: detail.seller_stats_source,
             country: detail.seller_country,
+            countryCode: detail.seller_country_code,
+            segment: detail.seller_segment,
         });
     },
     failedRequestHandler: async ({ request }, error) => {
@@ -261,6 +263,19 @@ await detailCrawler.run(
 const scrapedAt = new Date().toISOString();
 const leads = buildMerchantLeads(aggregates, sellerDetails, input, input.country, scrapedAt).slice(0, input.maxSellers);
 qualifiedLeadCount = leads.length;
+const qualificationFilterCounts = aggregates.reduce<Record<string, number>>((counts, aggregate) => {
+    const reason = merchantLeadFilterReason(sellerDetails.get(aggregate.seller_id), input);
+    if (reason) counts[reason] = (counts[reason] ?? 0) + 1;
+    return counts;
+}, {});
+const filteredCandidateCount = Object.values(qualificationFilterCounts).reduce((sum, count) => sum + count, 0);
+log.info('Seller qualification completed', {
+    candidates: aggregates.length,
+    qualifiedBeforeOutputCap: aggregates.length - filteredCandidateCount,
+    outputAfterCap: qualifiedLeadCount,
+    filtered: filteredCandidateCount,
+    filterReasonCounts: qualificationFilterCounts,
+});
 
 const stateStore = await Actor.openKeyValueStore(input.dedupeStoreName);
 const previousState = normalizePersistentState(await stateStore.getValue('STATE'));
