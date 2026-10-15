@@ -20,10 +20,6 @@ function segment(value: unknown): SellerSegment {
 }
 
 function countryCode(value: unknown, countryName: unknown): string | null {
-    const normalizedCode = string(value)?.toUpperCase();
-    if (normalizedCode === 'UK') return 'GB';
-    if (normalizedCode) return normalizedCode;
-
     const normalizedName = string(countryName)?.toLowerCase().replace(/[^a-z]/g, '');
     if (
         normalizedName === 'unitedkingdom' ||
@@ -33,6 +29,10 @@ function countryCode(value: unknown, countryName: unknown): string | null {
         normalizedName === 'wales' ||
         normalizedName === 'northernireland'
     ) return 'GB';
+
+    const normalizedCode = string(value)?.toUpperCase();
+    if (normalizedCode === 'UK') return 'GB';
+    if (normalizedCode) return normalizedCode;
 
     return null;
 }

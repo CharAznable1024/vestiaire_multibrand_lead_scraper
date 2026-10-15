@@ -61,6 +61,7 @@ describe('seller detail parser', () => {
         [{ country: 'United Kingdom' }, 'GB'],
         [{ country: 'United Kingdom', country_i_s_o: 'UK' }, 'GB'],
         [{ country: 'United Kingdom', country_i_s_o: 'GB' }, 'GB'],
+        [{ country: 'United Kingdom', country_i_s_o: 'FR' }, 'GB'],
     ])('normalizes the United Kingdom country code to GB', (countryFields, expectedCode) => {
         const detail = parseSellerDetailJson(
             {
