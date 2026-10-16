@@ -146,9 +146,9 @@ const usesCustomProxyUrls = (proxyInput.proxyUrls?.length ?? 0) > 0;
 // Direct Playwright is the primary route. When Bright Data is configured,
 // suppress the legacy automatic Residential route and use Web Unlocker only
 // after an actual block. Explicit proxyConfiguration still takes precedence.
-const useApifyMarketProxy =
-    !usesCustomProxyUrls && (proxyInput.useApifyProxy === true || (input.autoMarketProxy && brightData === null));
-const wantsProxy = useApifyMarketProxy || usesCustomProxyUrls;
+const useExplicitApifyProxy = !usesCustomProxyUrls && proxyInput.useApifyProxy === true;
+const useApifyMarketProxy = !usesCustomProxyUrls && !useExplicitApifyProxy && input.autoMarketProxy && brightData === null;
+const wantsProxy = useExplicitApifyProxy || useApifyMarketProxy || usesCustomProxyUrls;
 const proxyConfiguration = wantsProxy
     ? await Actor.createProxyConfiguration({
           ...proxyInput,
@@ -165,11 +165,27 @@ const proxyConfiguration = wantsProxy
 log.info('Market routing configured', {
     market: input.country,
     autoMarketProxy: input.autoMarketProxy,
-    autoMarketProxySuppressedByBrightData: input.autoMarketProxy && brightData !== null && proxyInput.useApifyProxy !== true,
+    autoMarketProxySuppressedByBrightData: input.autoMarketProxy && brightData !== null && !useExplicitApifyProxy,
     brightDataFallbackConfigured: brightData !== null,
-    proxyMode: usesCustomProxyUrls ? 'custom_urls' : useApifyMarketProxy ? 'apify_market_proxy' : 'disabled',
-    proxyGroups: usesCustomProxyUrls ? undefined : proxyInput.apifyProxyGroups?.length ? proxyInput.apifyProxyGroups : ['RESIDENTIAL'],
-    proxyCountry: usesCustomProxyUrls ? undefined : proxyInput.apifyProxyCountry ?? marketProxyCountry(input.country),
+    proxyMode: usesCustomProxyUrls
+        ? 'custom_urls'
+        : useApifyMarketProxy
+          ? 'apify_market_residential'
+          : useExplicitApifyProxy
+            ? 'apify_datacenter_or_explicit_group'
+            : 'disabled',
+    proxyGroups: usesCustomProxyUrls
+        ? undefined
+        : useApifyMarketProxy
+          ? proxyInput.apifyProxyGroups?.length
+              ? proxyInput.apifyProxyGroups
+              : ['RESIDENTIAL']
+          : proxyInput.apifyProxyGroups,
+    proxyCountry: usesCustomProxyUrls
+        ? undefined
+        : useApifyMarketProxy
+          ? proxyInput.apifyProxyCountry ?? marketProxyCountry(input.country)
+          : proxyInput.apifyProxyCountry,
 });
 
 function ingestUnlockedProductDetail(json: string, source: string, detailUrl: string): void {
