@@ -236,7 +236,11 @@ const searchCrawler = new PlaywrightCrawler({
     navigationTimeoutSecs: input.navigationTimeoutSecs,
     useSessionPool: true,
     persistCookiesPerSession: true,
-    launchContext: { launchOptions: { headless: true, args: ['--disable-gpu'] } },
+    launchContext: {
+        useIncognitoPages: true,
+        ignoreProxyCertificate: true,
+        launchOptions: { headless: true, args: ['--disable-gpu'] },
+    },
     preNavigationHooks: [async ({ page, request }, gotoOptions) => {
         gotoOptions.waitUntil = 'domcontentloaded';
         const responsePromise = captureSearchResponse(page, input.navigationTimeoutSecs * 1_000);
@@ -368,7 +372,11 @@ if (unlockedProductSources.size > 0) {
         navigationTimeoutSecs: input.navigationTimeoutSecs,
         useSessionPool: true,
         persistCookiesPerSession: true,
-        launchContext: { launchOptions: { headless: true, args: ['--disable-gpu'] } },
+        launchContext: {
+            useIncognitoPages: true,
+            ignoreProxyCertificate: true,
+            launchOptions: { headless: true, args: ['--disable-gpu'] },
+        },
         requestHandler: async ({ page, request }) => {
             const json = await page.locator('script#__NEXT_DATA__').textContent({ timeout: input.navigationTimeoutSecs * 1_000 });
             if (!json) throw new Error('Fallback product detail did not contain __NEXT_DATA__');
@@ -437,7 +445,11 @@ const detailCrawler = new PlaywrightCrawler({
     navigationTimeoutSecs: input.navigationTimeoutSecs,
     useSessionPool: true,
     persistCookiesPerSession: true,
-    launchContext: { launchOptions: { headless: true, args: ['--disable-gpu'] } },
+    launchContext: {
+        useIncognitoPages: true,
+        ignoreProxyCertificate: true,
+        launchOptions: { headless: true, args: ['--disable-gpu'] },
+    },
     requestHandler: async ({ page, request }) => {
         const sellerId = String(request.userData.sellerId);
         const json = await page.locator('script#__NEXT_DATA__').textContent({ timeout: input.navigationTimeoutSecs * 1_000 });
