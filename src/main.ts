@@ -423,7 +423,9 @@ for (const source of listingSources) {
             const unblockerFetcher = await getSearchApiUnblockerFetcher();
             const pages = await fetchPagesFromStoredTemplate(template, unblockerFetcher);
             const ingested = ingestSearchPages(pages, sourceName);
-            if (!ingested.normalizedProducts) throw new Error('Unblocked Search API returned no usable products');
+            if (!ingested.normalizedProducts) {
+                throw new Error(`Unblocked Search API returned no usable products (${ingested.rawItems} raw items)`);
+            }
             searchApiUnblockerSources += 1;
             await searchTemplateStore.setValue(templateKey, template);
             log.info('Listing source completed', {

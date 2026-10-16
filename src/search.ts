@@ -19,7 +19,9 @@ const FACET_FIELDS = [
 ];
 const MARKET_LOCALES: Record<Market, { country: string; currency: string; language: string; sizeType: string }> = {
     US: { country: 'US', currency: 'USD', language: 'us', sizeType: 'US' },
-    GB: { country: 'GB', currency: 'GBP', language: 'uk', sizeType: 'UK' },
+    // Vestiaire's public Search API is most stable with the US discovery
+    // locale. Seller-country targeting remains independent in filters.country.
+    GB: { country: 'US', currency: 'USD', language: 'us', sizeType: 'US' },
     FR: { country: 'FR', currency: 'EUR', language: 'fr', sizeType: 'FR' },
     DE: { country: 'DE', currency: 'EUR', language: 'de', sizeType: 'DE' },
     IT: { country: 'IT', currency: 'EUR', language: 'it', sizeType: 'IT' },

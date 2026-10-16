@@ -42,7 +42,7 @@ describe('catalog and pagination routing', () => {
         expect(template.payload).toMatchObject({
             q: 'gucci',
             filters: { country: ['GB'] },
-            locale: { country: 'GB', currency: 'GBP', language: 'uk', sizeType: 'UK' },
+            locale: { country: 'US', currency: 'USD', language: 'us', sizeType: 'US' },
             pagination: { offset: 0, limit: 60 },
         });
     });
