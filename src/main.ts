@@ -162,6 +162,11 @@ const proxyConfiguration = wantsProxy
           checkAccess: true,
       })
     : undefined;
+if (proxyConfiguration && proxyInput.apifyProxyGroups?.includes('UNBLOCKER')) {
+    // Apify Unblocker terminates TLS as a man-in-the-middle proxy. Crawlee
+    // uses this flag to create Playwright pages with ignoreHTTPSErrors.
+    proxyConfiguration.isManInTheMiddle = true;
+}
 log.info('Market routing configured', {
     market: input.country,
     autoMarketProxy: input.autoMarketProxy,
