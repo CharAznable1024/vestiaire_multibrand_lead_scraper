@@ -105,7 +105,9 @@ This downstream Actor adds a per-search-page cost. Contact evidence is cached fo
 
 ## Automatic access fallback
 
-The Actor does not require operators to choose an access provider. It tries Direct Playwright first. When a listing source, product detail, seller detail, or Profile page is blocked, it automatically calls Bright Data Web Unlocker and continues the same parsing pipeline. If unlocked listing HTML is returned, product links are opened and converted back into the normal seller-evidence model before qualification and deduplication.
+The Actor does not require operators to choose an access provider. Search discovery first constructs and posts the public Vestiaire Search API payload directly. A failed direct API request is retried through Apify UNBLOCKER; the browser is used only to refresh a missing or stale request template. Product and seller detail pages remain Direct-first and use Bright Data only after their normal retries fail.
+
+Successful browser captures are stored in the named `vestiaire-search-api-templates-v1` key-value store. Future runs parameterize the captured template with the requested query, seller countries, market locale, and pagination offset instead of opening the search page again.
 
 The run summary records `bright_data_request_attempts`, `bright_data_successful_requests`, `bright_data_recovered_pages`, and `bright_data_estimated_cost_usd`. Only non-empty responses without a Bright Data error header count as successful requests. The current account price is estimated at `$0.0015` per successful request.
 
@@ -116,6 +118,7 @@ Bright Data may reject specific domains until account KYC is completed. The Acto
 The main cost drivers are:
 
 - one browser search/category page per discovery source and page
+- Apify UNBLOCKER for Search API requests that fail directly; each successful request uses 10 Unblocker units
 - one representative product detail per candidate seller, capped by `maxSellerDetailCandidates`
 - Bright Data fallback requests only after Direct Playwright is blocked, estimated at $1.50 per 1,000 successful requests
 - one downstream Google search page per uncached contact candidate, capped by `maxContactEnrichmentLeads`

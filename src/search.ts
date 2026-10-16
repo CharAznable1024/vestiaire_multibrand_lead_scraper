@@ -1,8 +1,30 @@
 import type { Page, Response } from 'playwright';
 
-import type { CapturedSearchResponse, RawSearchResponse } from './types.js';
+import type { CapturedSearchResponse, Market, RawSearchResponse } from './types.js';
 
 const SEARCH_ENDPOINT_FRAGMENT = 'search.vestiairecollective.com/v1/product/search';
+const SEARCH_ENDPOINT = `https://${SEARCH_ENDPOINT_FRAGMENT}`;
+const SEARCH_FIELDS = [
+    'name', 'description', 'brand', 'model', 'country', 'price', 'discount', 'link', 'sold', 'likes',
+    'editorPicks', 'shouldBeGone', 'seller', 'directShipping', 'local', 'pictures', 'colors', 'size',
+    'stock', 'universeId', 'createdAt', 'dutyFree',
+];
+const FACET_FIELDS = [
+    'brand', 'universe', 'country', 'stock', 'color', 'categoryLvl0', 'priceRange', 'price', 'condition',
+    'region', 'editorPicks', 'watchMechanism', 'discount', 'sold', 'directShippingEligible',
+    'directShippingCountries', 'localCountries', 'sellerBadge', 'isOfficialStore', 'materialLvl0',
+    'materialLvl1', 'size0', 'size1', 'size2', 'size3', 'size4', 'size5', 'size6', 'size7', 'size8',
+    'size9', 'size10', 'size11', 'size12', 'size13', 'size14', 'size15', 'size16', 'size17', 'size18',
+    'size19', 'size20', 'size21', 'size22', 'size23', 'size26', 'categoryLvl1', 'categoryLvl2', 'dutyFree',
+];
+const MARKET_LOCALES: Record<Market, { country: string; currency: string; language: string; sizeType: string }> = {
+    US: { country: 'US', currency: 'USD', language: 'us', sizeType: 'US' },
+    GB: { country: 'GB', currency: 'GBP', language: 'uk', sizeType: 'UK' },
+    FR: { country: 'FR', currency: 'EUR', language: 'fr', sizeType: 'FR' },
+    DE: { country: 'DE', currency: 'EUR', language: 'de', sizeType: 'DE' },
+    IT: { country: 'IT', currency: 'EUR', language: 'it', sizeType: 'IT' },
+    ES: { country: 'ES', currency: 'EUR', language: 'es', sizeType: 'ES' },
+};
 const FORBIDDEN_FORWARD_HEADERS = new Set([
     'accept-encoding',
     'authorization',
@@ -14,6 +36,9 @@ const FORBIDDEN_FORWARD_HEADERS = new Set([
     'proxy-authorization',
     'referer',
     'user-agent',
+    'traceparent',
+    'x-deviceid',
+    'x-userid',
 ]);
 
 function isSearchResponse(response: Response): boolean {
@@ -47,6 +72,62 @@ export interface StoredSearchTemplate {
     observed_at: string;
 }
 
+export interface SearchTemplateInput {
+    query: string;
+    sellerCountries: string[];
+    market: Market;
+    limit?: number;
+}
+
+export function buildSearchTemplate(input: SearchTemplateInput): StoredSearchTemplate {
+    return {
+        endpoint: SEARCH_ENDPOINT,
+        headers: {
+            accept: 'application/json',
+            'accept-language': input.market === 'US' ? 'en-US' : 'en-GB',
+            'content-type': 'application/json',
+            'x-datadog-origin': 'rum',
+            'x-usecase': 'plpStandard',
+        },
+        payload: {
+            pagination: { offset: 0, limit: input.limit ?? 60 },
+            fields: SEARCH_FIELDS,
+            facets: { fields: FACET_FIELDS, stats: ['price'] },
+            q: input.query,
+            sortBy: 'relevance',
+            filters: input.sellerCountries.length ? { country: input.sellerCountries } : {},
+            locale: MARKET_LOCALES[input.market],
+            mySizes: null,
+            options: {
+                innerFeedContext: 'genericPLP',
+                disableHierarchicalParentFiltering: true,
+                enableGuidedSearch: true,
+            },
+            recentlyViewedProductIDs: [],
+        },
+        observed_at: new Date().toISOString(),
+    };
+}
+
+export function parameterizeSearchTemplate(
+    template: StoredSearchTemplate,
+    input: SearchTemplateInput,
+): StoredSearchTemplate {
+    const constructed = buildSearchTemplate(input);
+    return {
+        endpoint: template.endpoint || constructed.endpoint,
+        headers: { ...constructed.headers, ...forwardedHeaders(template.headers) },
+        payload: {
+            ...structuredClone(template.payload),
+            q: constructed.payload.q,
+            filters: constructed.payload.filters,
+            locale: constructed.payload.locale,
+            pagination: constructed.payload.pagination,
+        },
+        observed_at: template.observed_at,
+    };
+}
+
 function forwardedHeaders(headers: Record<string, string>): Record<string, string> {
     return Object.fromEntries(
         Object.entries(headers).filter(
@@ -54,6 +135,8 @@ function forwardedHeaders(headers: Record<string, string>): Record<string, strin
                 /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) &&
                 !FORBIDDEN_FORWARD_HEADERS.has(name.toLowerCase()) &&
                 !name.toLowerCase().startsWith('sec-') &&
+                !name.toLowerCase().startsWith('x-datadog-') &&
+                !name.toLowerCase().startsWith('x-search-') &&
                 !/[\r\n]/.test(value),
         ),
     );

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { PlaywrightCrawler } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
+import { request as playwrightRequest, type APIRequestContext } from 'playwright';
 
 import {
     BrightDataWebUnlocker,
@@ -18,8 +19,10 @@ import { globalSearchUrl, marketCatalogUrl, marketProxyCountry, searchUrl, selle
 import { normalizeProduct } from './normalize.js';
 import {
     captureSearchResponse,
+    buildSearchTemplate,
     fetchSearchPageFromTemplateWithRetries,
     fetchSearchPageWithRetries,
+    parameterizeSearchTemplate,
     storeSearchTemplate,
     type StoredSearchTemplate,
 } from './search.js';
@@ -56,6 +59,7 @@ let emittedLeadCount = 0;
 let duplicateSuppressedCount = 0;
 let brightDataRecoveredPages = 0;
 let searchApiDirectSources = 0;
+let searchApiUnblockerSources = 0;
 let searchApiBrowserSources = 0;
 let searchApiTemplateFallbacks = 0;
 let contactEnrichmentAttempted = 0;
@@ -82,9 +86,12 @@ function ingestSearchPages(pages: RawSearchResponse[], source: string): { rawIte
     return { rawItems: rawItems.length, normalizedProducts };
 }
 
-async function fetchPagesFromStoredTemplate(template: StoredSearchTemplate): Promise<RawSearchResponse[]> {
+async function fetchPagesFromStoredTemplate(
+    template: StoredSearchTemplate,
+    fetcher: typeof fetch = fetch,
+): Promise<RawSearchResponse[]> {
     const timeoutMillis = input.navigationTimeoutSecs * 1_000;
-    const first = await fetchSearchPageFromTemplateWithRetries(template, 0, timeoutMillis, input.maxRequestRetries);
+    const first = await fetchSearchPageFromTemplateWithRetries(template, 0, timeoutMillis, input.maxRequestRetries, fetcher);
     const pages: RawSearchResponse[] = [first];
     const totalPages = Math.max(1, Math.trunc(first.paginationStats?.totalPages ?? 1));
     const pageLimit = Math.min(totalPages, input.maxPagesPerQuery);
@@ -98,6 +105,7 @@ async function fetchPagesFromStoredTemplate(template: StoredSearchTemplate): Pro
                 pageNumber * firstPageSize,
                 timeoutMillis,
                 input.maxRequestRetries,
+                fetcher,
             ),
         );
     }
@@ -124,6 +132,7 @@ const summary = (status: RunSummary['status']): RunSummary => ({
     bright_data_recovered_pages: brightDataRecoveredPages,
     bright_data_estimated_cost_usd: brightData?.estimatedCostUsd ?? 0,
     search_api_direct_sources: searchApiDirectSources,
+    search_api_unblocker_sources: searchApiUnblockerSources,
     search_api_browser_sources: searchApiBrowserSources,
     search_api_template_fallbacks: searchApiTemplateFallbacks,
     contact_enrichment_attempted: contactEnrichmentAttempted,
@@ -166,6 +175,49 @@ if (proxyConfiguration && proxyInput.apifyProxyGroups?.includes('UNBLOCKER')) {
     // Apify Unblocker terminates TLS as a man-in-the-middle proxy. Crawlee
     // uses this flag to create Playwright pages with ignoreHTTPSErrors.
     proxyConfiguration.isManInTheMiddle = true;
+}
+const searchUnblockerProxyConfiguration = proxyInput.apifyProxyGroups?.includes('UNBLOCKER') && proxyConfiguration
+    ? proxyConfiguration
+    : await Actor.createProxyConfiguration({
+          useApifyProxy: true,
+          apifyProxyGroups: ['UNBLOCKER'],
+          checkAccess: true,
+      });
+if (!searchUnblockerProxyConfiguration) throw new Error('Could not create Apify Unblocker proxy configuration');
+const activeSearchUnblockerProxyConfiguration = searchUnblockerProxyConfiguration;
+activeSearchUnblockerProxyConfiguration.isManInTheMiddle = true;
+let searchApiRequestContext: APIRequestContext | null = null;
+
+async function getSearchApiUnblockerFetcher(): Promise<typeof fetch> {
+    if (!searchApiRequestContext) {
+        const proxyUrlValue = await activeSearchUnblockerProxyConfiguration.newUrl();
+        if (!proxyUrlValue) throw new Error('Apify Unblocker did not provide a proxy URL');
+        const proxyUrl = new URL(proxyUrlValue);
+        searchApiRequestContext = await playwrightRequest.newContext({
+            ignoreHTTPSErrors: true,
+            proxy: {
+                server: `${proxyUrl.protocol}//${proxyUrl.host}`,
+                username: decodeURIComponent(proxyUrl.username),
+                password: decodeURIComponent(proxyUrl.password),
+            },
+        });
+    }
+    return async (resource, init) => {
+        const response = await searchApiRequestContext!.fetch(String(resource), {
+            method: init?.method,
+            headers: Object.fromEntries(new Headers(init?.headers).entries()),
+            data: typeof init?.body === 'string' ? init.body : undefined,
+            failOnStatusCode: false,
+            timeout: input.navigationTimeoutSecs * 1_000,
+        });
+        return new Response(new Uint8Array(await response.body()), { status: response.status(), headers: response.headers() });
+    };
+}
+
+async function disposeSearchApiRequestContext(): Promise<void> {
+    if (!searchApiRequestContext) return;
+    await searchApiRequestContext.dispose();
+    searchApiRequestContext = null;
 }
 log.info('Market routing configured', {
     market: input.country,
@@ -229,7 +281,7 @@ async function recoverListingSourceWithBrightData(url: string, source: string): 
 }
 
 const searchCrawler = new PlaywrightCrawler({
-    proxyConfiguration,
+    proxyConfiguration: proxyConfiguration ?? searchUnblockerProxyConfiguration,
     maxConcurrency: input.maxConcurrency,
     maxRequestRetries: input.maxRequestRetries,
     requestHandlerTimeoutSecs: input.navigationTimeoutSecs * 2 + 45,
@@ -312,12 +364,12 @@ const unfilteredListingSources = [
     ...input.searchQueries.map((query) => ({
         url: input.sellerCountries.length ? globalSearchUrl(query) : searchUrl(query, input.country),
         uniqueKey: `query:${input.country}:${query.toLowerCase()}`,
-        userData: { source: query },
+        userData: { source: query, query },
     })),
     ...effectiveStartUrls.map((url) => ({
         url,
         uniqueKey: `url:${url}`,
-        userData: { source: url },
+        userData: { source: url, query: new URL(url).searchParams.get('q') ?? '' },
     })),
 ];
 const listingSources = input.sellerCountries.length
@@ -325,7 +377,7 @@ const listingSources = input.sellerCountries.length
           input.sellerCountries.map((countryCode) => ({
               url: shippedFromSearchUrl(source.url, countryCode),
               uniqueKey: `${source.uniqueKey}:shipped-from:${countryCode}`,
-              userData: { source: `${String(source.userData.source)} [shipped from ${countryCode}]` },
+              userData: { ...source.userData, source: `${String(source.userData.source)} [shipped from ${countryCode}]` },
           })),
       )
     : unfilteredListingSources;
@@ -333,15 +385,30 @@ const browserListingSources: typeof listingSources = [];
 for (const source of listingSources) {
     const sourceName = String(source.userData.source);
     const templateKey = searchTemplateKey(source.url);
-    const template = await searchTemplateStore.getValue<StoredSearchTemplate>(templateKey);
-    if (!template) {
+    const sourceUrl = new URL(source.url);
+    if (!/^\/search\/?$/i.test(sourceUrl.pathname)) {
         browserListingSources.push(source);
         continue;
     }
+    const constructedTemplate = buildSearchTemplate({
+        query: String(source.userData.query ?? ''),
+        sellerCountries: input.sellerCountries,
+        market: input.country,
+        limit: Math.max(60, Math.min(120, input.maxListingsPerQuery)),
+    });
+    const storedTemplate = await searchTemplateStore.getValue<StoredSearchTemplate>(templateKey);
+    const template = storedTemplate
+        ? parameterizeSearchTemplate(storedTemplate, {
+              query: String(source.userData.query ?? ''),
+              sellerCountries: input.sellerCountries,
+              market: input.country,
+              limit: Math.max(60, Math.min(120, input.maxListingsPerQuery)),
+          })
+        : constructedTemplate;
     try {
         const pages = await fetchPagesFromStoredTemplate(template);
         const ingested = ingestSearchPages(pages, sourceName);
-        if (!ingested.normalizedProducts) throw new Error('Stored Search API template returned no usable products');
+        if (!ingested.normalizedProducts) throw new Error('Direct Search API returned no usable products');
         searchApiDirectSources += 1;
         log.info('Listing source completed', {
             source: sourceName,
@@ -350,16 +417,36 @@ for (const source of listingSources) {
             templateKey,
             templateObservedAt: template.observed_at,
         });
-    } catch (error) {
-        searchApiTemplateFallbacks += 1;
-        log.warning('Stored Search API template failed; falling back to browser capture', {
-            source: sourceName,
-            templateKey,
-            error: String(error),
-        });
-        browserListingSources.push(source);
+        continue;
+    } catch (directError) {
+        try {
+            const unblockerFetcher = await getSearchApiUnblockerFetcher();
+            const pages = await fetchPagesFromStoredTemplate(template, unblockerFetcher);
+            const ingested = ingestSearchPages(pages, sourceName);
+            if (!ingested.normalizedProducts) throw new Error('Unblocked Search API returned no usable products');
+            searchApiUnblockerSources += 1;
+            await searchTemplateStore.setValue(templateKey, template);
+            log.info('Listing source completed', {
+                source: sourceName,
+                ...ingested,
+                accessMode: 'search_api_unblocker',
+                templateKey,
+                directError: String(directError),
+            });
+            continue;
+        } catch (unblockerError) {
+            searchApiTemplateFallbacks += 1;
+            log.warning('Search API routes failed; falling back to browser capture', {
+                source: sourceName,
+                templateKey,
+                directError: String(directError),
+                unblockerError: String(unblockerError),
+            });
+            browserListingSources.push(source);
+        }
     }
 }
+await disposeSearchApiRequestContext();
 if (browserListingSources.length) await searchCrawler.run(browserListingSources);
 
 if (unlockedProductSources.size > 0) {
