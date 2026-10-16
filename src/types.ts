@@ -234,6 +234,9 @@ export interface RunSummary {
     bright_data_successful_requests: number;
     bright_data_recovered_pages: number;
     bright_data_estimated_cost_usd: number;
+    search_api_direct_sources: number;
+    search_api_browser_sources: number;
+    search_api_template_fallbacks: number;
     contact_enrichment_attempted: number;
     contact_enrichment_verified: number;
     contact_enrichment_cached: number;

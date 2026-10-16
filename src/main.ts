@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { PlaywrightCrawler } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
 
@@ -14,7 +16,13 @@ import { normalizeInput } from './input.js';
 import { aggregateSellers, buildMerchantLeads, countSellers, merchantLeadFilterReason } from './leads.js';
 import { globalSearchUrl, marketCatalogUrl, marketProxyCountry, searchUrl, sellerProfileUrl, shippedFromSearchUrl } from './market.js';
 import { normalizeProduct } from './normalize.js';
-import { captureSearchResponse, fetchSearchPageWithRetries } from './search.js';
+import {
+    captureSearchResponse,
+    fetchSearchPageFromTemplateWithRetries,
+    fetchSearchPageWithRetries,
+    storeSearchTemplate,
+    type StoredSearchTemplate,
+} from './search.js';
 import { parseProductDetailEvidenceNextData, parseProfileStatsText, parseSellerDetailNextData } from './seller-detail.js';
 import type { ActorInput, CapturedSearchResponse, ProductRecord, RawSearchResponse, RunSummary, SellerDetail } from './types.js';
 
@@ -22,6 +30,7 @@ await Actor.init();
 
 const input = normalizeInput(await Actor.getInput<ActorInput>());
 const startedAt = new Date().toISOString();
+const searchTemplateStore = await Actor.openKeyValueStore('vestiaire-search-api-templates-v1');
 const brightDataApiKey = process.env.BRIGHT_DATA_API_KEY?.trim();
 const brightData = brightDataApiKey
     ? new BrightDataWebUnlocker({
@@ -46,12 +55,53 @@ let qualifiedLeadCount = 0;
 let emittedLeadCount = 0;
 let duplicateSuppressedCount = 0;
 let brightDataRecoveredPages = 0;
+let searchApiDirectSources = 0;
+let searchApiBrowserSources = 0;
+let searchApiTemplateFallbacks = 0;
 let contactEnrichmentAttempted = 0;
 let contactEnrichmentVerified = 0;
 let contactEnrichmentCached = 0;
 
 function responseKey(request: { id?: string; uniqueKey: string }): string {
     return request.id ?? request.uniqueKey;
+}
+
+function searchTemplateKey(url: string): string {
+    return `SOURCE_${createHash('sha256').update(url).digest('hex').slice(0, 40)}`;
+}
+
+function ingestSearchPages(pages: RawSearchResponse[], source: string): { rawItems: number; normalizedProducts: number } {
+    const rawItems = pages.flatMap((result) => result.items ?? []).slice(0, input.maxListingsPerQuery);
+    let normalizedProducts = 0;
+    for (const rawItem of rawItems) {
+        const product = normalizeProduct(rawItem, source, input.country);
+        if (!product) continue;
+        productsById.set(product.item_id, product);
+        normalizedProducts += 1;
+    }
+    return { rawItems: rawItems.length, normalizedProducts };
+}
+
+async function fetchPagesFromStoredTemplate(template: StoredSearchTemplate): Promise<RawSearchResponse[]> {
+    const timeoutMillis = input.navigationTimeoutSecs * 1_000;
+    const first = await fetchSearchPageFromTemplateWithRetries(template, 0, timeoutMillis, input.maxRequestRetries);
+    const pages: RawSearchResponse[] = [first];
+    const totalPages = Math.max(1, Math.trunc(first.paginationStats?.totalPages ?? 1));
+    const pageLimit = Math.min(totalPages, input.maxPagesPerQuery);
+    const firstPageSize = Math.max(1, first.items?.length ?? 48);
+    for (let pageNumber = 1; pageNumber < pageLimit; pageNumber += 1) {
+        const count = pages.reduce((sum, result) => sum + (result.items?.length ?? 0), 0);
+        if (count >= input.maxListingsPerQuery) break;
+        pages.push(
+            await fetchSearchPageFromTemplateWithRetries(
+                template,
+                pageNumber * firstPageSize,
+                timeoutMillis,
+                input.maxRequestRetries,
+            ),
+        );
+    }
+    return pages;
 }
 
 const summary = (status: RunSummary['status']): RunSummary => ({
@@ -73,6 +123,9 @@ const summary = (status: RunSummary['status']): RunSummary => ({
     bright_data_successful_requests: brightData?.successfulRequests ?? 0,
     bright_data_recovered_pages: brightDataRecoveredPages,
     bright_data_estimated_cost_usd: brightData?.estimatedCostUsd ?? 0,
+    search_api_direct_sources: searchApiDirectSources,
+    search_api_browser_sources: searchApiBrowserSources,
+    search_api_template_fallbacks: searchApiTemplateFallbacks,
     contact_enrichment_attempted: contactEnrichmentAttempted,
     contact_enrichment_verified: contactEnrichmentVerified,
     contact_enrichment_cached: contactEnrichmentCached,
@@ -176,6 +229,16 @@ const searchCrawler = new PlaywrightCrawler({
         const initialSearch = await capturedResponses.get(key);
         if (!initialSearch) throw new Error(`Missing search response listener for ${source}`);
         const captured = initialSearch;
+        const template = storeSearchTemplate(captured);
+        await searchTemplateStore.setValue(searchTemplateKey(request.url), template);
+        searchApiBrowserSources += 1;
+        log.info('Captured and stored Search API template', {
+            source,
+            endpoint: template.endpoint,
+            templateKey: searchTemplateKey(request.url),
+            headerNames: Object.keys(template.headers).sort(),
+            payloadKeys: Object.keys(template.payload).sort(),
+        });
 
         const pages: RawSearchResponse[] = [captured.data];
         const totalPages = Math.max(1, Math.trunc(captured.data.paginationStats?.totalPages ?? 1));
@@ -196,15 +259,8 @@ const searchCrawler = new PlaywrightCrawler({
             }
         }
 
-        const rawItems = pages.flatMap((result) => result.items ?? []).slice(0, input.maxListingsPerQuery);
-        let normalizedCount = 0;
-        for (const rawItem of rawItems) {
-            const product = normalizeProduct(rawItem, source, input.country);
-            if (!product) continue;
-            productsById.set(product.item_id, product);
-            normalizedCount += 1;
-        }
-        log.info('Listing source completed', { source, rawItems: rawItems.length, normalizedProducts: normalizedCount });
+        const ingested = ingestSearchPages(pages, source);
+        log.info('Listing source completed', { source, ...ingested, accessMode: 'browser_capture' });
         capturedResponses.delete(key);
     },
     failedRequestHandler: async ({ request }, error) => {
@@ -248,7 +304,38 @@ const listingSources = input.sellerCountries.length
           })),
       )
     : unfilteredListingSources;
-await searchCrawler.run(listingSources);
+const browserListingSources: typeof listingSources = [];
+for (const source of listingSources) {
+    const sourceName = String(source.userData.source);
+    const templateKey = searchTemplateKey(source.url);
+    const template = await searchTemplateStore.getValue<StoredSearchTemplate>(templateKey);
+    if (!template) {
+        browserListingSources.push(source);
+        continue;
+    }
+    try {
+        const pages = await fetchPagesFromStoredTemplate(template);
+        const ingested = ingestSearchPages(pages, sourceName);
+        if (!ingested.normalizedProducts) throw new Error('Stored Search API template returned no usable products');
+        searchApiDirectSources += 1;
+        log.info('Listing source completed', {
+            source: sourceName,
+            ...ingested,
+            accessMode: 'direct_search_api',
+            templateKey,
+            templateObservedAt: template.observed_at,
+        });
+    } catch (error) {
+        searchApiTemplateFallbacks += 1;
+        log.warning('Stored Search API template failed; falling back to browser capture', {
+            source: sourceName,
+            templateKey,
+            error: String(error),
+        });
+        browserListingSources.push(source);
+    }
+}
+if (browserListingSources.length) await searchCrawler.run(browserListingSources);
 
 if (unlockedProductSources.size > 0) {
     const fallbackProductUrls = [...unlockedProductSources.keys()].slice(0, input.maxSellerDetailCandidates);
