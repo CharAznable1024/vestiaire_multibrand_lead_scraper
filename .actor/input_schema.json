@@ -5,6 +5,23 @@
   "type": "object",
   "schemaVersion": 1,
   "properties": {
+    "campaignId": {
+      "title": "Aime campaign ID",
+      "type": "string",
+      "description": "Optional Aime campaign identifier passed through to every Dataset row and OUTPUT record.",
+      "editor": "textfield",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "maxLength": 128,
+      "sectionCaption": "Aime orchestration"
+    },
+    "shardId": {
+      "title": "Aime shard ID",
+      "type": "string",
+      "description": "Optional Aime shard identifier passed through to every Dataset row and OUTPUT record.",
+      "editor": "textfield",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "maxLength": 128
+    },
     "searchQueries": {
       "title": "Search queries",
       "type": "array",

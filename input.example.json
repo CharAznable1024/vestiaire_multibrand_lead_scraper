@@ -1,4 +1,6 @@
 {
+  "campaignId": "cmp_example",
+  "shardId": "shd_example",
   "searchQueries": [],
   "startUrls": [],
   "country": "US",

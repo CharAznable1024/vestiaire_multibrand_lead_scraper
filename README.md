@@ -45,6 +45,14 @@ The Actor definition sets a default platform timeout of 1,800 seconds (30 minute
 
 For country filters and strict thresholds, use maxSellerDetailCandidates as the exploration budget. The Actor stops early when enough leads are found; increasing this value only gives the Actor more candidates to inspect when the filter is selective.
 
+### Aime campaign and shard tracing
+
+The Actor accepts optional campaignId and shardId inputs. When Aime enables pass_through_ids, both values are copied to every Dataset record as campaign_id and shard_id. run_id is always read from the current Apify runtime, so it cannot be supplied or overridden by the caller.
+
+OUTPUT and PROGRESS include campaign_id, shard_id, run_id, and dataset_id. OUTPUT also exposes scanned_count, qualified_count, next_cursor, and has_more for shard-level monitoring. next_cursor is currently null because Aime owns shard planning rather than asking this Actor to resume another Run.
+
+When campaignId and shardId are omitted, both output fields are null and all existing standalone inputs continue to work. This Actor does not launch other Runs, aggregate Campaign totals, merge Datasets, or decide which shard should run next; those responsibilities remain in Aime.
+
 ## Important input fields
 
 | Field | Default | Description |

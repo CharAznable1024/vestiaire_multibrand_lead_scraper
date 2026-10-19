@@ -4,7 +4,13 @@ import { normalizeInput } from '../src/input.js';
 
 describe('normalizeInput', () => {
     it('normalizes merchant discovery inputs and defaults', () => {
-        const input = normalizeInput({ searchQueries: [' Gucci ', 'Gucci', 'handbags'] });
+        const input = normalizeInput({
+            campaignId: 'cmp_uk_100',
+            shardId: 'shd_gucci_01',
+            searchQueries: [' Gucci ', 'Gucci', 'handbags'],
+        });
+        expect(input.campaignId).toBe('cmp_uk_100');
+        expect(input.shardId).toBe('shd_gucci_01');
         expect(input.searchQueries).toEqual(['Gucci', 'handbags']);
         expect(input.maxListingsPerQuery).toBe(48);
         expect(input.maxSellers).toBe(25);
@@ -32,5 +38,7 @@ describe('normalizeInput', () => {
         expect(() => normalizeInput({ dedupeStoreName: '../bad' })).toThrow(/dedupeStoreName/);
         expect(() => normalizeInput({ sellerCountries: ['United States'] })).toThrow(/sellerCountries/);
         expect(() => normalizeInput({ maxSellers: 10, maxSellerDetailCandidates: 9 })).toThrow(/maxSellerDetailCandidates/);
+        expect(() => normalizeInput({ campaignId: 'bad campaign id' })).toThrow(/campaignId/);
+        expect(() => normalizeInput({ shardId: '' })).toThrow(/shardId/);
     });
 });

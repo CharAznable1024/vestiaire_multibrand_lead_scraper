@@ -11,17 +11,27 @@ describe('merchant lead aggregation', () => {
             product({ item_id: 'item-2', brand: 'Chanel', category: 'Jackets', source_query: 'Chanel', item_url: 'https://example.com/item-2' }),
         ];
         const aggregates = aggregateSellers(products);
-        const input = normalizeInput({ searchQueries: ['Gucci'], minItemsSold: 5, minItemsListed: 1 });
+        const input = normalizeInput({
+            campaignId: 'cmp_uk_100',
+            shardId: 'shd_gucci_01',
+            searchQueries: ['Gucci'],
+            minItemsSold: 5,
+            minItemsListed: 1,
+        });
         const leads = buildMerchantLeads(
             aggregates,
             new Map([['seller-1', sellerDetail()]]),
             input,
             'US',
             '2026-10-12T00:00:00.000Z',
+            'run-123',
         );
         expect(leads).toHaveLength(1);
         expect(leads[0]).toMatchObject({
             schema_version: '2.0',
+            campaign_id: 'cmp_uk_100',
+            shard_id: 'shd_gucci_01',
+            run_id: 'run-123',
             seller_name: 'Sample Luxury Store',
             seller_username: 'sampleluxurystore',
             seller_segment: 'B2C',

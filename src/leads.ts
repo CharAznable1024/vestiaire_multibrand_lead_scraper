@@ -138,6 +138,7 @@ export function buildMerchantLeads(
     input: NormalizedInput,
     market: Market,
     scrapedAt: string,
+    runId = 'local',
 ): LeadRecord[] {
     return aggregates
         .filter((aggregate) => {
@@ -159,6 +160,9 @@ export function buildMerchantLeads(
             return {
                 record_type: 'merchant_lead' as const,
                 schema_version: '2.0' as const,
+                campaign_id: input.campaignId,
+                shard_id: input.shardId,
+                run_id: runId,
                 seller_id: aggregate.seller_id,
                 seller_name: sellerName,
                 seller_username: detail?.seller_username ?? null,

@@ -32,6 +32,8 @@ import type { ActorInput, CapturedSearchResponse, ProductRecord, RawSearchRespon
 await Actor.init();
 
 const input = normalizeInput(await Actor.getInput<ActorInput>());
+const runId = process.env.APIFY_ACTOR_RUN_ID?.trim() || process.env.ACTOR_RUN_ID?.trim() || 'local';
+const datasetId = process.env.APIFY_DEFAULT_DATASET_ID?.trim() || process.env.ACTOR_DEFAULT_DATASET_ID?.trim() || 'default';
 const startedAt = new Date().toISOString();
 const searchTemplateStore = await Actor.openKeyValueStore('vestiaire-search-api-templates-v1');
 const brightDataApiKey = process.env.BRIGHT_DATA_API_KEY?.trim();
@@ -118,6 +120,14 @@ async function fetchPagesFromStoredTemplate(
 const summary = (status: RunSummary['status']): RunSummary => ({
     status,
     schema_version: '2.0',
+    campaign_id: input.campaignId,
+    shard_id: input.shardId,
+    run_id: runId,
+    dataset_id: datasetId,
+    scanned_count: sellerDetails.size + failedSellerDetails.size,
+    qualified_count: Math.max(partialLeadCount, emittedLeadCount),
+    next_cursor: null,
+    has_more: status !== 'SUCCEEDED' && sellerDetails.size + failedSellerDetails.size < sellerDetailAttempted,
     search_queries: input.searchQueries,
     start_urls: effectiveStartUrls,
     failed_sources: failedSources,
@@ -155,6 +165,12 @@ Actor.on('aborting', async () => {
 });
 
 await Actor.setValue('OUTPUT', summary('RUNNING'));
+log.info('Aime run context configured', {
+    campaignId: input.campaignId,
+    shardId: input.shardId,
+    runId,
+    datasetId,
+});
 
 const proxyInput = input.proxyConfiguration;
 const usesCustomProxyUrls = (proxyInput.proxyUrls?.length ?? 0) > 0;
@@ -545,7 +561,7 @@ async function checkpointQualifiedLeadsUnsafe(): Promise<void> {
         await detailCrawler.autoscaledPool?.abort();
         return;
     }
-    const current = buildMerchantLeads(aggregates, sellerDetails, input, input.country, now);
+    const current = buildMerchantLeads(aggregates, sellerDetails, input, input.country, now, runId);
     const pending = current.filter((lead) => !streamedSellerIds.has(lead.seller_id));
     const checkpoint = applyCrossRunDedupe(
         pending,
@@ -569,6 +585,10 @@ async function checkpointQualifiedLeadsUnsafe(): Promise<void> {
     checkpointUpdatedAt = now;
     await Actor.setValue('PROGRESS', {
         status: 'RUNNING',
+        campaign_id: input.campaignId,
+        shard_id: input.shardId,
+        run_id: runId,
+        dataset_id: datasetId,
         seller_detail_attempted: sellerDetailAttempted,
         seller_detail_succeeded: sellerDetails.size,
         seller_detail_failed: failedSellerDetails.size,
@@ -721,7 +741,7 @@ await detailCrawler.run(
 );
 
 const scrapedAt = new Date().toISOString();
-const leads = buildMerchantLeads(aggregates, sellerDetails, input, input.country, scrapedAt).slice(0, input.maxSellers);
+const leads = buildMerchantLeads(aggregates, sellerDetails, input, input.country, scrapedAt, runId).slice(0, input.maxSellers);
 qualifiedLeadCount = leads.length;
 const qualificationFilterCounts = aggregates.reduce<Record<string, number>>((counts, aggregate) => {
     const reason = merchantLeadFilterReason(sellerDetails.get(aggregate.seller_id), input);

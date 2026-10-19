@@ -12,6 +12,8 @@ export interface ProxyInput {
 }
 
 export interface ActorInput {
+    campaignId?: unknown;
+    shardId?: unknown;
     searchQueries?: unknown;
     startUrls?: unknown;
     country?: unknown;
@@ -43,6 +45,8 @@ export interface ActorInput {
 }
 
 export interface NormalizedInput {
+    campaignId: string | null;
+    shardId: string | null;
     searchQueries: string[];
     startUrls: string[];
     country: Market;
@@ -141,6 +145,9 @@ export type Qualification = 'high' | 'medium' | 'low';
 export interface LeadRecord {
     record_type: 'merchant_lead';
     schema_version: '2.0';
+    campaign_id: string | null;
+    shard_id: string | null;
+    run_id: string;
     seller_id: string;
     seller_name: string | null;
     seller_username: string | null;
@@ -218,6 +225,14 @@ export interface PersistentLeadState {
 export interface RunSummary {
     status: 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'ABORTED';
     schema_version: '2.0';
+    campaign_id: string | null;
+    shard_id: string | null;
+    run_id: string;
+    dataset_id: string;
+    scanned_count: number;
+    qualified_count: number;
+    next_cursor: string | null;
+    has_more: boolean;
     search_queries: string[];
     start_urls: string[];
     failed_sources: Array<{ source: string; error: string }>;

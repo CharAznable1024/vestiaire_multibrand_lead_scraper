@@ -6,6 +6,9 @@
     "properties": {
       "record_type": { "type": "string" },
       "schema_version": { "type": "string" },
+      "campaign_id": { "type": ["string", "null"] },
+      "shard_id": { "type": ["string", "null"] },
+      "run_id": { "type": "string" },
       "seller_id": { "type": "string" },
       "seller_name": { "type": ["string", "null"] },
       "seller_username": { "type": ["string", "null"] },
@@ -58,6 +61,9 @@
       "title": "Merchant leads",
       "transformation": {
         "fields": [
+          "campaign_id",
+          "shard_id",
+          "run_id",
           "seller_name",
           "seller_username",
           "profile_url",
@@ -89,6 +95,9 @@
       "display": {
         "component": "table",
         "properties": {
+          "campaign_id": { "label": "Campaign ID", "format": "text" },
+          "shard_id": { "label": "Shard ID", "format": "text" },
+          "run_id": { "label": "Run ID", "format": "text" },
           "seller_name": { "label": "Seller", "format": "text" },
           "seller_username": { "label": "Username", "format": "text" },
           "profile_url": { "label": "Vestiaire profile", "format": "link" },

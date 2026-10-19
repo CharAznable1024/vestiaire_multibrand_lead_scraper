@@ -25,6 +25,16 @@ function text(value: unknown, fallback: string, field: string, pattern?: RegExp)
     return candidate.trim();
 }
 
+function optionalIdentifier(value: unknown, field: string): string | null {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== 'string') throw new Error(`${field} must be a string`);
+    const candidate = value.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(candidate)) {
+        throw new Error(`${field} must be 1-128 characters using letters, numbers, dot, underscore, colon, or hyphen`);
+    }
+    return candidate;
+}
+
 function stringList(value: unknown, fallback: string[], field: string, maximum: number): string[] {
     const candidate = value === undefined ? fallback : value;
     if (!Array.isArray(candidate)) throw new Error(`${field} must be an array of strings`);
@@ -101,6 +111,8 @@ export function normalizeInput(raw: ActorInput | null | undefined): NormalizedIn
     }
 
     return {
+        campaignId: optionalIdentifier(input.campaignId, 'campaignId'),
+        shardId: optionalIdentifier(input.shardId, 'shardId'),
         searchQueries,
         startUrls: urls,
         country,
