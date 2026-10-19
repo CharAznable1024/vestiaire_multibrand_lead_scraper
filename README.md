@@ -28,6 +28,23 @@ No login is used. The Actor processes public listing and product-detail data. It
 7. Optionally discover and verify public business contacts.
 8. Apply persistent cross-run deduplication and write one Dataset row per emitted merchant.
 
+### Generic filtering and timeout behavior
+
+Filtering is input-driven and shared across markets. The same Actor flow accepts any seller country, sold/listed thresholds, seller segments, output cap, and candidate cap; no country-specific code path is required.
+
+Seller details are processed incrementally. After each successful seller-detail request, the Actor:
+
+1. re-evaluates the common qualification rules;
+2. writes newly qualified leads to the Dataset immediately;
+3. stores progress in the PROGRESS key-value record; and
+4. stops the detail queue once maxSellers qualified leads have been reached.
+
+If Apify stops a run because of its platform timeout, already checkpointed Dataset rows remain available. OUTPUT contains partial_lead_count, checkpoint_seller_count, and checkpoint_updated_at. When contactEnrichment is enabled, the final contact-enriched record may appear as a later update for the same seller_id; consumers should keep the latest record per seller.
+
+The Actor definition sets a default platform timeout of 1,800 seconds (30 minutes) and 2,048 MB memory in .actor/actor.json. This is only the default applied by apify call or the Console when no run option overrides it. A run can explicitly set a shorter timeout, such as timeoutSecs=300 (5 minutes), which takes precedence and can stop the Actor before all candidates are inspected. navigationTimeoutSecs is different: it limits one page/request, not the whole Actor run.
+
+For country filters and strict thresholds, use maxSellerDetailCandidates as the exploration budget. The Actor stops early when enough leads are found; increasing this value only gives the Actor more candidates to inspect when the filter is selective.
+
 ## Important input fields
 
 | Field | Default | Description |

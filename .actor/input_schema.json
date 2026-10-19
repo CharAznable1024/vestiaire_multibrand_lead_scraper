@@ -72,7 +72,7 @@
     "maxSellerDetailCandidates": {
       "title": "Maximum seller detail candidates",
       "type": "integer",
-      "description": "Maximum unique sellers whose public detail pages are inspected before country and qualification filters. Increase this when filtering to a specific seller country.",
+      "description": "Maximum unique sellers whose public detail pages are inspected before country and qualification filters. The Actor stops early after maxSellers qualified leads; increase this only when strict filters need more candidates.",
       "editor": "number",
       "default": 100,
       "minimum": 1,

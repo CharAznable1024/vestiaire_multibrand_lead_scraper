@@ -65,6 +65,9 @@ let searchApiTemplateFallbacks = 0;
 let contactEnrichmentAttempted = 0;
 let contactEnrichmentVerified = 0;
 let contactEnrichmentCached = 0;
+let partialLeadCount = 0;
+let checkpointSellerCount = 0;
+let checkpointUpdatedAt: string | undefined;
 
 function responseKey(request: { id?: string; uniqueKey: string }): string {
     return request.id ?? request.uniqueKey;
@@ -138,6 +141,9 @@ const summary = (status: RunSummary['status']): RunSummary => ({
     contact_enrichment_attempted: contactEnrichmentAttempted,
     contact_enrichment_verified: contactEnrichmentVerified,
     contact_enrichment_cached: contactEnrichmentCached,
+    partial_lead_count: partialLeadCount,
+    checkpoint_seller_count: checkpointSellerCount,
+    ...(checkpointUpdatedAt ? { checkpoint_updated_at: checkpointUpdatedAt } : {}),
     started_at: startedAt,
     ...(status === 'RUNNING' ? {} : { finished_at: new Date().toISOString() }),
 });
@@ -526,7 +532,67 @@ log.info('Seller candidates prepared', {
 // location. Always enrich first, then filter on Seller Detail's country code.
 const aggregates = allAggregates.slice(0, input.maxSellerDetailCandidates);
 sellerDetailAttempted = aggregates.length;
-const detailCrawler = new PlaywrightCrawler({
+const stateStore = await Actor.openKeyValueStore(input.dedupeStoreName);
+const previousState = normalizePersistentState(await stateStore.getValue('STATE'));
+const streamedSellerIds = new Set<string>();
+let detailCrawler: PlaywrightCrawler;
+let checkpointQueue = Promise.resolve();
+
+async function checkpointQualifiedLeadsUnsafe(): Promise<void> {
+    const now = new Date().toISOString();
+    const remainingSlots = Math.max(0, input.maxSellers - partialLeadCount);
+    if (remainingSlots === 0) {
+        await detailCrawler.autoscaledPool?.abort();
+        return;
+    }
+    const current = buildMerchantLeads(aggregates, sellerDetails, input, input.country, now);
+    const pending = current.filter((lead) => !streamedSellerIds.has(lead.seller_id));
+    const checkpoint = applyCrossRunDedupe(
+        pending,
+        previousState,
+        input.dedupeMode,
+        input.reemitAfterDays,
+        now,
+    );
+    const checkpointRecords = checkpoint.emitted.slice(0, remainingSlots);
+    if (checkpointRecords.length) {
+        await Actor.pushData(checkpointRecords);
+        for (const lead of checkpointRecords) streamedSellerIds.add(lead.seller_id);
+        partialLeadCount += checkpointRecords.length;
+        log.info('Checkpointed qualified seller leads', {
+            checkpointed: checkpointRecords.length,
+            partialLeadCount,
+            target: input.maxSellers,
+        });
+    }
+    checkpointSellerCount = sellerDetails.size;
+    checkpointUpdatedAt = now;
+    await Actor.setValue('PROGRESS', {
+        status: 'RUNNING',
+        seller_detail_attempted: sellerDetailAttempted,
+        seller_detail_succeeded: sellerDetails.size,
+        seller_detail_failed: failedSellerDetails.size,
+        partial_lead_count: partialLeadCount,
+        checkpoint_seller_count: checkpointSellerCount,
+        updated_at: now,
+    });
+    await Actor.setValue('OUTPUT', summary('RUNNING'));
+    if (partialLeadCount >= input.maxSellers) {
+        log.info('Maximum qualified seller count reached; stopping detail crawler', {
+            partialLeadCount,
+            target: input.maxSellers,
+        });
+        await detailCrawler.autoscaledPool?.abort();
+    }
+}
+
+function checkpointQualifiedLeads(): Promise<void> {
+    const operation = checkpointQueue.then(() => checkpointQualifiedLeadsUnsafe());
+    checkpointQueue = operation.catch(() => undefined);
+    return operation;
+}
+
+detailCrawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxConcurrency: input.maxSellerDetailConcurrency,
     maxRequestRetries: input.maxRequestRetries,
@@ -597,6 +663,7 @@ const detailCrawler = new PlaywrightCrawler({
             }
         }
         sellerDetails.set(sellerId, detail);
+        await checkpointQualifiedLeads();
         log.info('Seller detail enriched', {
             sellerId,
             itemsSold: detail.items_sold,
@@ -620,6 +687,7 @@ const detailCrawler = new PlaywrightCrawler({
                     throw new Error(`Seller ID mismatch: expected ${sellerId}, got ${detail.seller_id}`);
                 }
                 sellerDetails.set(sellerId, detail);
+                await checkpointQualifiedLeads();
                 brightDataRecoveredPages += 1;
                 log.warning('Seller detail recovered through Bright Data', {
                     sellerId,
@@ -669,8 +737,6 @@ log.info('Seller qualification completed', {
     filterReasonCounts: qualificationFilterCounts,
 });
 
-const stateStore = await Actor.openKeyValueStore(input.dedupeStoreName);
-const previousState = normalizePersistentState(await stateStore.getValue('STATE'));
 const contactResult = await enrichContacts(leads, input, previousState, scrapedAt);
 contactEnrichmentAttempted = contactResult.attempted;
 contactEnrichmentVerified = contactResult.verified;
@@ -680,7 +746,11 @@ emittedLeadCount = dedupeResult.emitted.length;
 duplicateSuppressedCount = dedupeResult.suppressed;
 await stateStore.setValue('STATE', dedupeResult.state);
 
-if (dedupeResult.emitted.length) await Actor.pushData(dedupeResult.emitted);
+const finalRecords = dedupeResult.emitted.filter((lead) => {
+    const wasCheckpointed = streamedSellerIds.has(lead.seller_id);
+    return !wasCheckpointed || input.contactEnrichment;
+});
+if (finalRecords.length) await Actor.pushData(finalRecords);
 await Actor.setValue('OUTPUT', { ...summary('SUCCEEDED'), finished_at: new Date().toISOString() });
 log.info('Run completed', summary('SUCCEEDED'));
 await Actor.exit();

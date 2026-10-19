@@ -241,6 +241,9 @@ export interface RunSummary {
     contact_enrichment_attempted: number;
     contact_enrichment_verified: number;
     contact_enrichment_cached: number;
+    partial_lead_count: number;
+    checkpoint_seller_count: number;
+    checkpoint_updated_at?: string;
     started_at: string;
     finished_at?: string;
 }
